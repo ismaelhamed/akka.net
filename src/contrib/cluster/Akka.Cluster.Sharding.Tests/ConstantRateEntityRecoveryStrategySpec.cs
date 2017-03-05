@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Akka.TestKit;
+using Akka.Util.Internal;
 using FluentAssertions;
 using Xunit;
 
@@ -32,8 +33,9 @@ namespace Akka.Cluster.Sharding.Tests
         {
             var entities = ImmutableHashSet.Create<EntityId>("1", "2", "3", "4", "5");
             var startTime = DateTime.UtcNow;
+
             var resultWithTimes = strategy.RecoverEntities(entities)
-                .Select(async bucketTask => new KeyValuePair<IImmutableSet<string>, TimeSpan>(await bucketTask, DateTime.UtcNow - startTime))
+                .Select(scheduledRecovery => scheduledRecovery.ContinueWith(t => new KeyValuePair<IImmutableSet<string>, TimeSpan>(t.Result, DateTime.UtcNow - startTime)))
                 .ToArray();
 
             var result = Task.WhenAll(resultWithTimes).Result.OrderBy(pair => pair.Value).ToArray();
