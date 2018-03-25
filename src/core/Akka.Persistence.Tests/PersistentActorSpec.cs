@@ -605,7 +605,7 @@ namespace Akka.Persistence.Tests
         }
 
         [Fact]
-        public void PersistentActor_should_brecover_the_message_which_caused_the_restart()
+        public void PersistentActor_should_recover_the_message_which_caused_the_restart()
         {
             var persistentActor = ActorOf(Props.Create(() => new RecoverMessageCausedRestart(Name)));
             persistentActor.Tell("boom");
@@ -625,6 +625,14 @@ namespace Akka.Persistence.Tests
             ExpectMsgInOrder("a-1", "a-2", "rc-1", "rc-2", "rc-3", "invalid");
             Watch(persistentActor);
             persistentActor.Tell("boom");
+            ExpectTerminated(persistentActor);
+        }
+
+        [Fact]
+        public void PersistentActor_should_stop_actor_when_direct_exception_from_receiveRecover()
+        {
+            var persistentActor = ActorOf(Props.Create(() => new ExceptionActor(Name)));
+            Watch(persistentActor);
             ExpectTerminated(persistentActor);
         }
     }
