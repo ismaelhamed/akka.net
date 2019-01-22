@@ -164,7 +164,14 @@ namespace Akka.Persistence
         /// <summary>
         /// TBD
         /// </summary>
-        public IActorRef Journal => _journal ?? (_journal = Extension.JournalFor(JournalPluginId));
+        public IActorRef Journal
+        {
+            get
+            {
+                Log.Info("PersistentActor [{PathName}] asking for [{JournalPluginId}]", Context.Self.Path.Name, JournalPluginId);
+                return _journal ?? (_journal = Extension.JournalFor(JournalPluginId));
+            }
+        }
 
         /// <summary>
         /// TBD

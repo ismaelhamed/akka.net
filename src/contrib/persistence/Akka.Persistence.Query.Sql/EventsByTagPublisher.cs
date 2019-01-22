@@ -47,6 +47,7 @@ namespace Akka.Persistence.Query.Sql
             MaxBufferSize = maxBufferSize;
             WriteJournalPluginId = writeJournalPluginId;
             Buffer = new DeliveryBuffer<EventEnvelope>(OnNext);
+            Log.Info("ActorPublisher [{PathName}] asking for [{JournalPluginId}]", Context.Self.Path.Name, writeJournalPluginId);
             JournalRef = Persistence.Instance.Apply(Context.System).JournalFor(writeJournalPluginId);
         }
 

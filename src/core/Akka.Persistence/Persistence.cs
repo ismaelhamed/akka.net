@@ -167,7 +167,6 @@ namespace Akka.Persistence
         public EventAdapters AdaptersFor(string journalPluginId)
         {
             var configPath = string.IsNullOrEmpty(journalPluginId) ? _defaultJournalPluginId.Value : journalPluginId;
-
             return PluginHolderFor(configPath, JournalFallbackConfigPath).Adapters;
         }
 
@@ -233,6 +232,9 @@ namespace Akka.Persistence
         {
             var configPath = string.IsNullOrEmpty(journalPluginId) ? _defaultJournalPluginId.Value : journalPluginId;
 
+            if(string.IsNullOrEmpty(journalPluginId))
+                _log.Info("JournalFor for NULL is {JournalPluginId}", _defaultJournalPluginId.Value);
+
             return PluginHolderFor(configPath, JournalFallbackConfigPath).Ref;
         }
 
@@ -250,7 +252,6 @@ namespace Akka.Persistence
         public IActorRef SnapshotStoreFor(string snapshotPluginId)
         {
             var configPath = string.IsNullOrEmpty(snapshotPluginId) ? _defaultSnapshotPluginId.Value : snapshotPluginId;
-
             return PluginHolderFor(configPath, SnapshotStoreFallbackConfigPath).Ref;
         }
 
@@ -275,7 +276,6 @@ namespace Akka.Persistence
             var pluginDispatcherId = pluginConfig.GetString("plugin-dispatcher");
             object[] pluginActorArgs = pluginType.GetConstructor(new[] { typeof(Config) }) != null ? new object[] { pluginConfig } : null;
             var pluginActorProps = new Props(pluginType, pluginActorArgs).WithDispatcher(pluginDispatcherId);
-
             return system.SystemActorOf(pluginActorProps, pluginActorName);
         }
 

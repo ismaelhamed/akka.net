@@ -12,8 +12,24 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Akka.Logger.Serilog" Version="1.3.9" />
+    <PackageReference Include="Akka.Persistence.Oracle" Version="1.3.11" />
+    <PackageReference Include="Akka.Serialization.Hyperion" Version="1.3.11-beta" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="3.1.1" />
+    <PackageReference Include="Serilog.Sinks.Seq" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\contrib\cluster\Akka.Cluster.Sharding\Akka.Cluster.Sharding.csproj" />
+    <ProjectReference Include="..\..\contrib\persistence\Akka.Persistence.Query.Sql\Akka.Persistence.Query.Sql.csproj" />
+    <ProjectReference Include="..\..\core\Akka.Persistence.Query\Akka.Persistence.Query.csproj" />
     <ProjectReference Include="..\..\core\Akka.Persistence\Akka.Persistence.csproj" />
-    <ProjectReference Include="..\..\contrib\persistence\Akka.Persistence.Sqlite\Akka.Persistence.Sqlite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="application.conf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <PropertyGroup Condition=" '$(TargetFramework)' == 'net452' ">

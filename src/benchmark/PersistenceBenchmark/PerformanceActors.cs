@@ -61,12 +61,20 @@ namespace PersistenceBenchmark
     public class PerformanceTestActor : PersistentActor
     {
         private long state = 0L;
-        public PerformanceTestActor(string persistenceId)
+        //public PerformanceTestActor(string persistenceId)
+        //{
+        //    PersistenceId = persistenceId;
+        //}
+
+        public PerformanceTestActor()
         {
-            PersistenceId = persistenceId;
+            PersistenceId = Context.Self.Path.Name;
+            //JournalPluginId = "akka.persistence.journal.oracle";
         }
 
         public sealed override string PersistenceId { get; }
+
+        public static Props Props() => Akka.Actor.Props.Create<PerformanceTestActor>();
 
         protected override bool ReceiveRecover(object message) => message.Match()
             .With<Stored>(s => state += s.Value)
@@ -75,7 +83,7 @@ namespace PersistenceBenchmark
         protected override bool ReceiveCommand(object message) => message.Match()
             .With<Store>(store =>
             {
-                Persist(new Stored(store.Value), s =>
+                DeferAsync(new Stored(store.Value), s =>
                 {
                     state += s.Value;
                 });
@@ -83,7 +91,7 @@ namespace PersistenceBenchmark
             .With<Init>(_ =>
             {
                 var sender = Sender;
-                Persist(new Stored(0), s =>
+                DeferAsync(new Stored(0), s =>
                 {
                     state += s.Value;
                     sender.Tell(Done.Instance);

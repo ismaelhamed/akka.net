@@ -34,6 +34,7 @@ namespace Akka.Persistence.Query
 
         public TJournal ReadJournalFor<TJournal>(string readJournalPluginId) where TJournal : IReadJournal
         {
+            Log.Info("PersistenceQuery.ReadJournalFor {ReadJournalPluginId}", readJournalPluginId);
             var plugin = _readJournalPluginExtensionIds.GetOrAdd(readJournalPluginId, path => CreatePlugin(path, GetDefaultConfig<TJournal>()).GetReadJournal());
             return (TJournal)plugin;
         }
@@ -87,6 +88,7 @@ namespace Akka.Persistence.Query
         public static TJournal ReadJournalFor<TJournal>(this ActorSystem system, string readJournalPluginId)
             where TJournal : IReadJournal
         {
+            system.Log.Info("PersistenceQueryExtensions.ReadJournalFor {ReadJournalPluginId}", readJournalPluginId);
             return PersistenceQuery.Get(system).ReadJournalFor<TJournal>(readJournalPluginId);
         }
     }
