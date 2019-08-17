@@ -9,12 +9,14 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Cluster.Tools.Singleton;
 using Akka.Configuration;
 using Akka.Dispatch;
+using Akka.Event;
 using Akka.Pattern;
 using Akka.Util;
 
@@ -1252,15 +1254,22 @@ namespace Akka.Cluster.Sharding
         /// <param name="from">TBD</param>
         /// <param name="handOffTimeout">TBD</param>
         /// <param name="regions">TBD</param>
+        /// <param name="shuttingDownRegions">TBD</param>
         /// <returns>TBD</returns>
-        public static Props Props(string shard, IActorRef @from, TimeSpan handOffTimeout, IEnumerable<IActorRef> regions)
+        public static Props Props(string shard, IActorRef @from, TimeSpan handOffTimeout, IEnumerable<IActorRef> regions, IEnumerable<IActorRef> shuttingDownRegions)
         {
-            return Actor.Props.Create(() => new RebalanceWorker(shard, @from, handOffTimeout, regions));
+            var regionArray = regions as IActorRef[] ?? regions.ToArray();
+            var shuttingDownRegionArray = shuttingDownRegions as IActorRef[] ?? shuttingDownRegions.ToArray();
+
+            return !(shuttingDownRegionArray.Length <= regionArray.Length) 
+                ? throw new ArgumentException("ShuttingDownRegions must be a subset of regions") 
+                : Actor.Props.Create(() => new RebalanceWorker(shard, @from, handOffTimeout, regionArray, shuttingDownRegionArray));
         }
 
         private readonly ShardId _shard;
         private readonly IActorRef _from;
         private readonly ISet<IActorRef> _remaining;
+        private readonly ILoggingAdapter _log = Context.GetLogger();
 
         /// <summary>
         /// TBD
@@ -1269,12 +1278,17 @@ namespace Akka.Cluster.Sharding
         /// <param name="from">TBD</param>
         /// <param name="handOffTimeout">TBD</param>
         /// <param name="regions">TBD</param>
-        public RebalanceWorker(string shard, IActorRef @from, TimeSpan handOffTimeout, IEnumerable<IActorRef> regions)
+        /// <param name="shuttingDownRegions">TBD</param>
+        public RebalanceWorker(string shard, IActorRef @from, TimeSpan handOffTimeout, IEnumerable<IActorRef> regions, IEnumerable<IActorRef> shuttingDownRegions)
         {
             _shard = shard;
             _from = @from;
 
             _remaining = new HashSet<IActorRef>(regions);
+
+            foreach (var shuttingDownRegion in shuttingDownRegions)
+                Context.Watch(shuttingDownRegion);
+
             foreach (var region in _remaining)
                 region.Tell(new PersistentShardCoordinator.BeginHandOff(shard));
 
@@ -1291,18 +1305,30 @@ namespace Akka.Cluster.Sharding
             switch (message)
             {
                 case PersistentShardCoordinator.BeginHandOffAck hoa when _shard == hoa.Shard:
-                    _remaining.Remove(Sender);
-                    if (_remaining.Count == 0)
-                    {
-                        _from.Tell(new PersistentShardCoordinator.HandOff(hoa.Shard));
-                        Context.Become(StoppingShard);
-                    }
+                    _log.Debug("BeginHandOffAck for shard [{Shard}] received from {Sender}.", _shard, Sender);
+                    Acked(Sender);
+                    return true;
+                case Terminated terminated:
+                    _log.Debug("ShardRegion {ShardRegion} terminated while waiting for BeginHandOffAck for shard [{Shard}].", _shard, terminated.ActorRef);
+                    Acked(terminated.ActorRef);
                     return true;
                 case ReceiveTimeout _:
                     Done(false);
                     return true;
             }
             return false;
+        }
+
+        private void Acked(IActorRef shardRegion)
+        {
+            Context.Unwatch(shardRegion);
+            _remaining.Remove(shardRegion);
+            if (_remaining.Count == 0)
+            {
+                _log.Debug("All shard regions acked, handing off shard [{Shard}].", _shard);
+                _from.Tell(new PersistentShardCoordinator.HandOff(_shard));
+                Context.Become(StoppingShard);
+            }
         }
 
         private bool StoppingShard(object message)
