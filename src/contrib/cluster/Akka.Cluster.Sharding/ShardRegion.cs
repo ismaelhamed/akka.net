@@ -931,15 +931,22 @@ namespace Akka.Cluster.Sharding
 
         private void RequestShardBufferHomes()
         {
+            var totalBuffered = 0;
+            var shards = new HashSet<string>();
             foreach (var buffer in ShardBuffers)
             {
-                const string logMsg = "{0}: Retry request for shard [{1}] homes from coordinator at [{2}]. [{3}] buffered messages.";
-                if (_retryCount >= RetryCountThreshold)
-                    Log.Warning(logMsg, TypeName, buffer.Key, _coordinator, buffer.Value.Count);
-                else
-                    Log.Debug(logMsg, TypeName, buffer.Key, _coordinator, buffer.Value.Count);
+                totalBuffered += buffer.Value.Count;
+                shards.Add(buffer.Key);
+                Log.Debug("{0}: Retry request for shard [{1}] homes from coordinator at [{2}]. [{3}] buffered messages.",
+                    TypeName, buffer.Key, _coordinator, buffer.Value.Count);
 
                 _coordinator.Tell(new PersistentShardCoordinator.GetShardHome(buffer.Key));
+            }
+
+            if (_retryCount >= 5 && _retryCount % 5 == 0 && Log.IsWarningEnabled)
+            {
+                Log.Warning("{0}: Retry request for shard [{1}] homes from coordinator. [{2}] buffered messages.",
+                    TypeName,string.Join(", ", shards.OrderBy(s=> s)), totalBuffered);
             }
         }
 
