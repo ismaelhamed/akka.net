@@ -569,25 +569,25 @@ namespace Akka.Cluster.Sharding
             {
                 if (actorSelections.Count > 0)
                 {
-                    var coordinatorMessage = Cluster.State.Unreachable.Contains(MembersByAge.First()) 
-                        ? $"Coordinator [{MembersByAge.First()}] is unreachable." 
+                    var coordinatorMessage = Cluster.State.Unreachable.Contains(MembersByAge.First())
+                        ? $"Coordinator [{MembersByAge.First()}] is unreachable."
                         : $"Coordinator [{MembersByAge.First()}] is reachable.";
 
-                    Log.Warning("{0}: Trying to register to coordinator at [{1}], but no acknowledgement. Total [{2}] buffered messages. [{3}]", 
-                        TypeName, 
-                        string.Join(", ", actorSelections.Select(i => i.PathString)), 
-                        TotalBufferSize, 
+                    Log.Warning("{0}: Trying to register to coordinator at [{1}], but no acknowledgement. Total [{2}] buffered messages. [{3}]",
+                        TypeName,
+                        string.Join(", ", actorSelections.Select(i => i.PathString)),
+                        TotalBufferSize,
                         coordinatorMessage);
                 }
                 else
                 {
                     // Members start off as "Removed"
                     var partOfCluster = Cluster.SelfMember.Status != MemberStatus.Removed;
-                    var possibleReason = partOfCluster 
-                        ? "Has Cluster Sharding been started on every node and nodes been configured with the correct role(s)?" 
+                    var possibleReason = partOfCluster
+                        ? "Has Cluster Sharding been started on every node and nodes been configured with the correct role(s)?"
                         : "Probably, no seed-nodes configured and manual cluster join not performed?";
 
-                    Log.Warning("{0}: No coordinator found to register. {1} Total [{2}] buffered messages.", 
+                    Log.Warning("{0}: No coordinator found to register. {1} Total [{2}] buffered messages.",
                         TypeName, possibleReason, TotalBufferSize);
                 }
             }
@@ -820,7 +820,7 @@ namespace Akka.Cluster.Sharding
             {
                 Log.Debug("Sending graceful shutdown to {0}", CoordinatorSelection);
                 CoordinatorSelection.ForEach(c => c.Tell(new PersistentShardCoordinator.GracefulShutdownRequest(Self)));
-            } 
+            }
         }
 
         private void HandleCoordinatorMessage(PersistentShardCoordinator.ICoordinatorMessage message)
@@ -946,7 +946,7 @@ namespace Akka.Cluster.Sharding
             if (_retryCount >= 5 && _retryCount % 5 == 0 && Log.IsWarningEnabled)
             {
                 Log.Warning("{0}: Retry request for shard [{1}] homes from coordinator. [{2}] buffered messages.",
-                    TypeName,string.Join(", ", shards.OrderBy(s=> s)), totalBuffered);
+                    TypeName, string.Join(", ", shards.OrderBy(s => s)), totalBuffered);
             }
         }
 
@@ -957,7 +957,16 @@ namespace Akka.Cluster.Sharding
                 Log.Debug("{0}: Deliver [{1}] buffered messages for shard [{2}]", TypeName, buffer.Count, shardId);
 
                 foreach (var m in buffer)
-                    receiver.Tell(m.Key, m.Value);
+                {
+                    if (m.Key is RestartShard _ && receiver != Self)
+                    {
+                        Log.Debug("Dropping buffered message {0}, these are only processed by a local ShardRegion.", m.Key.GetType().Name);
+                    }
+                    else
+                    {
+                        receiver.Tell(m.Key, m.Value);
+                    }
+                }
 
                 ShardBuffers = ShardBuffers.Remove(shardId);
             }
