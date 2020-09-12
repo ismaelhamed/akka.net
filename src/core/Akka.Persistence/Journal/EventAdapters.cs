@@ -9,7 +9,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using Akka.Actor;
 using Akka.Configuration;
 using Akka.Configuration.Hocon;
@@ -180,7 +179,7 @@ namespace Akka.Persistence.Journal
     public sealed class CombinedReadEventAdapter : IEventAdapter
     {
         private static readonly Exception OnlyReadSideException = new IllegalStateException(
-                "CombinedReadEventAdapter must not be used when writing (creating manifests) events!");
+            "CombinedReadEventAdapter must not be used when writing (creating manifests) events!");
 
         /// <summary>
         /// TBD
@@ -256,7 +255,7 @@ namespace Akka.Persistence.Journal
     }
 
     /// <summary>
-    /// TBD
+    /// <see cref="EventAdapters"/> serves as a per-journal collection of bound event adapters.
     /// </summary>
     public class EventAdapters
     {
@@ -275,7 +274,9 @@ namespace Akka.Persistence.Journal
             var adapters = ConfigToMap(config, "event-adapters");
             var adapterBindings = ConfigToListMap(config, "event-adapter-bindings");
 
-            return Create(system, adapters, adapterBindings);
+            return adapters.Count == 0 && adapterBindings.Count == 0 
+                ? IdentityEventAdapters.Instance 
+                : Create(system, adapters, adapterBindings);
         }
 
         private static EventAdapters Create(ExtendedActorSystem system, IDictionary<string, string> adapters, IDictionary<string, string[]> adapterBindings)
@@ -364,13 +365,16 @@ namespace Akka.Persistence.Journal
         }
 
         /// <summary>
-        /// TBD
+        /// Finds the "most specific" matching adapter for the given class (i.e. it may return an adapter that can work on a
+        /// interface implemented by the given class if no direct match is found).
+        ///
+        /// Falls back to <see cref="IdentityEventAdapter"/> if no adapter was defined for the given class.
         /// </summary>
         /// <param name="type">TBD</param>
         /// <returns>TBD</returns>
         public virtual IEventAdapter Get(Type type)
         {
-            if (_map.TryGetValue(type, out IEventAdapter adapter))
+            if (_map.TryGetValue(type, out var adapter))
                 return adapter;
 
             // bindings are ordered from most specific to least specific
