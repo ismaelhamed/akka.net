@@ -5,12 +5,11 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+using System;
+using System.Collections.Immutable;
 using Akka.Actor;
 using Akka.Configuration;
 using Akka.Dispatch;
-using System;
-using System.Collections.Immutable;
-using System.Collections.Generic;
 
 namespace Akka.DistributedData
 {
@@ -69,7 +68,7 @@ namespace Akka.DistributedData
             // TODO: This constructor call fails when these fields are not populated inside the Config object:
             // TODO: `pruning-marker-time-to-live` key depends on Config.GetTimeSpan() to return a TimeSpan.Zero default.
             return new ReplicatorSettings(
-                role: config.GetString("role"),
+                roles: new string[] { config.GetString("role") }.ToImmutableHashSet(),
                 gossipInterval: config.GetTimeSpan("gossip-interval"),
                 notifySubscribersInterval: config.GetTimeSpan("notify-subscribers-interval"),
                 maxDeltaElements: config.GetInt("max-delta-elements"),
@@ -80,7 +79,8 @@ namespace Akka.DistributedData
                 durableStoreProps: durableStoreProps,
                 pruningMarkerTimeToLive: config.GetTimeSpan("pruning-marker-time-to-live", null),
                 durablePruningMarkerTimeToLive: durableConfig.GetTimeSpan("pruning-marker-time-to-live"),
-                maxDeltaSize: config.GetInt("delta-crdt.max-delta-size"));
+                maxDeltaSize: config.GetInt("delta-crdt.max-delta-size"),
+                preferOldest: config.GetBoolean("prefer-oldest"));
         }
 
         /// <summary>
@@ -90,9 +90,9 @@ namespace Akka.DistributedData
         public bool IsDurable => !Equals(DurableStoreProps, Props.Empty);
 
         /// <summary>
-        /// Replicas are running on members tagged with this role. All members are used if undefined.
+        /// Replicas are running on members tagged with these roles. All members are used if undefined.
         /// </summary>
-        public string Role { get; }
+        public ImmutableHashSet<string> Roles { get; }
 
         /// <summary>
         /// How often the Replicator should send out gossip information.
@@ -141,7 +141,7 @@ namespace Akka.DistributedData
         public TimeSpan PruningMarkerTimeToLive { get; }
 
         /// <summary>
-        /// 
+        /// TBD
         /// </summary>
         public TimeSpan DurablePruningMarkerTimeToLive { get; }
 
@@ -153,20 +153,54 @@ namespace Akka.DistributedData
 
         public int MaxDeltaSize { get; }
 
+        /// <summary>
+        /// Update and Get operations are sent to oldest nodes first.
+        /// </summary>
+        public bool PreferOldest { get; }
+
+        // for backwards compatibility
         public ReplicatorSettings(string role,
-                                  TimeSpan gossipInterval,
-                                  TimeSpan notifySubscribersInterval,
-                                  int maxDeltaElements,
-                                  string dispatcher,
-                                  TimeSpan pruningInterval,
-                                  TimeSpan maxPruningDissemination, 
-                                  IImmutableSet<string> durableKeys, 
-                                  Props durableStoreProps, 
-                                  TimeSpan pruningMarkerTimeToLive, 
-                                  TimeSpan durablePruningMarkerTimeToLive,
-                                  int maxDeltaSize)
+            TimeSpan gossipInterval,
+            TimeSpan notifySubscribersInterval,
+            int maxDeltaElements,
+            string dispatcher,
+            TimeSpan pruningInterval,
+            TimeSpan maxPruningDissemination,
+            IImmutableSet<string> durableKeys,
+            Props durableStoreProps,
+            TimeSpan pruningMarkerTimeToLive,
+            TimeSpan durablePruningMarkerTimeToLive,
+            int maxDeltaSize) : this(
+                ImmutableHashSet.Create(role),
+                gossipInterval,
+                notifySubscribersInterval,
+                maxDeltaElements,
+                dispatcher,
+                pruningInterval,
+                maxPruningDissemination,
+                durableKeys,
+                durableStoreProps,
+                pruningMarkerTimeToLive,
+                durablePruningMarkerTimeToLive,
+                maxDeltaSize,
+                false)
+        { }
+
+        public ReplicatorSettings(ImmutableHashSet<string> roles,
+            TimeSpan gossipInterval,
+            TimeSpan notifySubscribersInterval,
+            int maxDeltaElements,
+            string dispatcher,
+            TimeSpan pruningInterval,
+            TimeSpan maxPruningDissemination,
+            IImmutableSet<string> durableKeys,
+            Props durableStoreProps,
+            TimeSpan pruningMarkerTimeToLive,
+            TimeSpan durablePruningMarkerTimeToLive,
+            int maxDeltaSize,
+            bool preferOldest)
         {
-            Role = role;
+            Roles = roles;
             GossipInterval = gossipInterval;
             NotifySubscribersInterval = notifySubscribersInterval;
             MaxDeltaElements = maxDeltaElements;
@@ -178,9 +212,10 @@ namespace Akka.DistributedData
             PruningMarkerTimeToLive = pruningMarkerTimeToLive;
             DurablePruningMarkerTimeToLive = durablePruningMarkerTimeToLive;
             MaxDeltaSize = maxDeltaSize;
+            PreferOldest = preferOldest;
         }
 
-        private ReplicatorSettings Copy(string role = null,
+        private ReplicatorSettings Copy(ImmutableHashSet<string> roles = null,
             TimeSpan? gossipInterval = null,
             TimeSpan? notifySubscribersInterval = null,
             int? maxDeltaElements = null,
@@ -191,34 +226,36 @@ namespace Akka.DistributedData
             Props durableStoreProps = null,
             TimeSpan? pruningMarkerTimeToLive = null,
             TimeSpan? durablePruningMarkerTimeToLive = null,
-            int? maxDeltaSize = null)
+            int? maxDeltaSize = null,
+            bool? preferOldest = null)
         {
             return new ReplicatorSettings(
-                role: role ?? this.Role,
-                gossipInterval: gossipInterval ?? this.GossipInterval,
-                notifySubscribersInterval: notifySubscribersInterval ?? this.NotifySubscribersInterval,
-                maxDeltaElements: maxDeltaElements ?? this.MaxDeltaElements,
-                dispatcher: dispatcher ?? this.Dispatcher,
-                pruningInterval: pruningInterval ?? this.PruningInterval,
-                maxPruningDissemination: maxPruningDissemination ?? this.MaxPruningDissemination,
-                durableKeys: durableKeys ?? this.DurableKeys,
-                durableStoreProps: durableStoreProps ?? this.DurableStoreProps,
-                pruningMarkerTimeToLive: pruningMarkerTimeToLive ?? this.PruningMarkerTimeToLive,
-                durablePruningMarkerTimeToLive: durablePruningMarkerTimeToLive ?? this.DurablePruningMarkerTimeToLive,
-                maxDeltaSize: maxDeltaSize ?? this.MaxDeltaSize);
+                roles: roles ?? Roles,
+                gossipInterval: gossipInterval ?? GossipInterval,
+                notifySubscribersInterval: notifySubscribersInterval ?? NotifySubscribersInterval,
+                maxDeltaElements: maxDeltaElements ?? MaxDeltaElements,
+                dispatcher: dispatcher ?? Dispatcher,
+                pruningInterval: pruningInterval ?? PruningInterval,
+                maxPruningDissemination: maxPruningDissemination ?? MaxPruningDissemination,
+                durableKeys: durableKeys ?? DurableKeys,
+                durableStoreProps: durableStoreProps ?? DurableStoreProps,
+                pruningMarkerTimeToLive: pruningMarkerTimeToLive ?? PruningMarkerTimeToLive,
+                durablePruningMarkerTimeToLive: durablePruningMarkerTimeToLive ?? DurablePruningMarkerTimeToLive,
+                maxDeltaSize: maxDeltaSize ?? MaxDeltaSize,
+                preferOldest: preferOldest ?? PreferOldest);
         }
 
-        public ReplicatorSettings WithRole(string role) => Copy(role: role);
+        public ReplicatorSettings WithRole(string role) => Copy(roles: ImmutableHashSet.Create(role));
+        public ReplicatorSettings WithRoles(string[] roles) => Copy(roles: ImmutableHashSet.Create(roles));
         public ReplicatorSettings WithGossipInterval(TimeSpan gossipInterval) => Copy(gossipInterval: gossipInterval);
         public ReplicatorSettings WithNotifySubscribersInterval(TimeSpan notifySubscribersInterval) => Copy(notifySubscribersInterval: notifySubscribersInterval);
         public ReplicatorSettings WithMaxDeltaElements(int maxDeltaElements) => Copy(maxDeltaElements: maxDeltaElements);
         public ReplicatorSettings WithDispatcher(string dispatcher) => Copy(dispatcher: string.IsNullOrEmpty(dispatcher) ? Dispatchers.DefaultDispatcherId : dispatcher);
-        public ReplicatorSettings WithPruning(TimeSpan pruningInterval, TimeSpan maxPruningDissemination) => 
-            Copy(pruningInterval: pruningInterval, maxPruningDissemination: maxPruningDissemination);
+        public ReplicatorSettings WithPruning(TimeSpan pruningInterval, TimeSpan maxPruningDissemination) => Copy(pruningInterval: pruningInterval, maxPruningDissemination: maxPruningDissemination);
         public ReplicatorSettings WithDurableKeys(IImmutableSet<string> durableKeys) => Copy(durableKeys: durableKeys);
         public ReplicatorSettings WithDurableStoreProps(Props durableStoreProps) => Copy(durableStoreProps: durableStoreProps);
-        public ReplicatorSettings WithPruningMarkerTimeToLive(TimeSpan pruningMarkerTtl, TimeSpan durablePruningMarkerTtl) =>
-            Copy(pruningMarkerTimeToLive: pruningMarkerTtl, durablePruningMarkerTimeToLive: durablePruningMarkerTtl);
+        public ReplicatorSettings WithPruningMarkerTimeToLive(TimeSpan pruningMarkerTtl, TimeSpan durablePruningMarkerTtl) => Copy(pruningMarkerTimeToLive: pruningMarkerTtl, durablePruningMarkerTimeToLive: durablePruningMarkerTtl);
         public ReplicatorSettings WithMaxDeltaSize(int maxDeltaSize) => Copy(maxDeltaSize: maxDeltaSize);
+        public ReplicatorSettings WithPreferOldest(bool preferOldest) => Copy(preferOldest: preferOldest);
     }
 }

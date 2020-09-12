@@ -81,6 +81,9 @@ namespace Akka.Cluster.Sharding
         public readonly TimeSpan EntityRecoveryConstantRateStrategyFrequency;
         public readonly int EntityRecoveryConstantRateStrategyNumberOfEntities;
 
+        public readonly int CoordinatorStateWriteMajorityPlus;
+        public readonly int CoordinatorStateReadMajorityPlus;
+
         /// <summary>
         /// TBD
         /// </summary>
@@ -101,6 +104,8 @@ namespace Akka.Cluster.Sharding
         /// <param name="entityRecoveryStrategy">TBD</param>
         /// <param name="entityRecoveryConstantRateStrategyFrequency">TBD</param>
         /// <param name="entityRecoveryConstantRateStrategyNumberOfEntities">TBD</param>
+        /// <param name="coordinatorStateWriteMajorityPlus">TBD</param>
+        /// <param name="coordinatorStateReadMajorityPlus">TBD</param>
         /// <exception cref="ArgumentException">
         /// This exception is thrown when the specified <paramref name="entityRecoveryStrategy"/> is invalid.
         /// Acceptable values include: all | constant
@@ -122,7 +127,9 @@ namespace Akka.Cluster.Sharding
             TimeSpan updatingStateTimeout,
             string entityRecoveryStrategy,
             TimeSpan entityRecoveryConstantRateStrategyFrequency,
-            int entityRecoveryConstantRateStrategyNumberOfEntities)
+            int entityRecoveryConstantRateStrategyNumberOfEntities,
+            int coordinatorStateWriteMajorityPlus,
+            int coordinatorStateReadMajorityPlus)
         {
             if (entityRecoveryStrategy != "all" && entityRecoveryStrategy != "constant")
                 throw new ArgumentException($"Unknown 'entity-recovery-strategy' [{entityRecoveryStrategy}], valid values are 'all' or 'constant'");
@@ -144,7 +151,50 @@ namespace Akka.Cluster.Sharding
             EntityRecoveryStrategy = entityRecoveryStrategy;
             EntityRecoveryConstantRateStrategyFrequency = entityRecoveryConstantRateStrategyFrequency;
             EntityRecoveryConstantRateStrategyNumberOfEntities = entityRecoveryConstantRateStrategyNumberOfEntities;
+            CoordinatorStateWriteMajorityPlus = coordinatorStateWriteMajorityPlus;
+            CoordinatorStateReadMajorityPlus = coordinatorStateReadMajorityPlus;
         }
+
+        // included for binary compatibility
+        [Obsolete("Since 1.4.11, use the ClusterShardingSettings factory methods or the constructor including coordinatorStateWriteMajorityPlus and coordinatorStateReadMajorityPlus instead.")]
+        public TunningParameters(
+            TimeSpan coordinatorFailureBackoff,
+            TimeSpan retryInterval,
+            int bufferSize,
+            TimeSpan handOffTimeout,
+            TimeSpan shardStartTimeout,
+            TimeSpan shardFailureBackoff,
+            TimeSpan entityRestartBackoff,
+            TimeSpan rebalanceInterval,
+            int snapshotAfter,
+            int keepNrOfBatches,
+            int leastShardAllocationRebalanceThreshold,
+            int leastShardAllocationMaxSimultaneousRebalance,
+            TimeSpan waitingForStateTimeout,
+            TimeSpan updatingStateTimeout,
+            string entityRecoveryStrategy,
+            TimeSpan entityRecoveryConstantRateStrategyFrequency,
+            int entityRecoveryConstantRateStrategyNumberOfEntities) : this(
+                coordinatorFailureBackoff,
+                retryInterval,
+                bufferSize,
+                handOffTimeout,
+                shardStartTimeout,
+                shardFailureBackoff,
+                entityRestartBackoff,
+                rebalanceInterval,
+                snapshotAfter,
+                keepNrOfBatches,
+                leastShardAllocationRebalanceThreshold,
+                leastShardAllocationMaxSimultaneousRebalance,
+                waitingForStateTimeout,
+                updatingStateTimeout,
+                entityRecoveryStrategy,
+                entityRecoveryConstantRateStrategyFrequency,
+                entityRecoveryConstantRateStrategyNumberOfEntities,
+                coordinatorStateWriteMajorityPlus: 5,
+                coordinatorStateReadMajorityPlus: 5)
+        { }
     }
 
     public enum StateStoreMode
@@ -237,6 +287,11 @@ namespace Akka.Cluster.Sharding
             if (config.IsNullOrEmpty())
                 throw ConfigurationException.NullOrEmptyConfig<ClusterShardingSettings>();
 
+            int ConfigMajorityPlus(string p)
+            {
+                return string.Equals(config.GetString(p), "all", StringComparison.OrdinalIgnoreCase) ? int.MaxValue : config.GetInt(p);
+            }
+
             var tuningParameters = new TunningParameters(
                 coordinatorFailureBackoff: config.GetTimeSpan("coordinator-failure-backoff"),
                 retryInterval: config.GetTimeSpan("retry-interval"),
@@ -254,7 +309,9 @@ namespace Akka.Cluster.Sharding
                 updatingStateTimeout: config.GetTimeSpan("updating-state-timeout"),
                 entityRecoveryStrategy: config.GetString("entity-recovery-strategy"),
                 entityRecoveryConstantRateStrategyFrequency: config.GetTimeSpan("entity-recovery-constant-rate-strategy.frequency"),
-                entityRecoveryConstantRateStrategyNumberOfEntities: config.GetInt("entity-recovery-constant-rate-strategy.number-of-entities"));
+                entityRecoveryConstantRateStrategyNumberOfEntities: config.GetInt("entity-recovery-constant-rate-strategy.number-of-entities"),
+                coordinatorStateWriteMajorityPlus: ConfigMajorityPlus("coordinator-state.write-majority-plus"),
+                coordinatorStateReadMajorityPlus: ConfigMajorityPlus("coordinator-state.read-majority-plus"));
 
             var coordinatorSingletonSettings = ClusterSingletonManagerSettings.Create(singletonConfig);
             var role = config.GetString("role", null);

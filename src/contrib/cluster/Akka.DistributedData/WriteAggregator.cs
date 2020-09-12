@@ -242,6 +242,43 @@ namespace Akka.DistributedData
         }
     }
 
+    /// <summary>
+    /// `WriteMajority` but with the given number of `additional` nodes added to the majority count. At most all nodes.
+    /// </summary>
+    public sealed class WriteMajorityPlus : IWriteConsistency, IEquatable<WriteMajorityPlus>
+    {
+        public TimeSpan Timeout { get; }
+        public int Additional { get; }
+        public int MinCapacity { get; }
+
+        public WriteMajorityPlus(TimeSpan timeout, int additional, int minCapacity = 0)
+        {
+            Timeout = timeout;
+            MinCapacity = minCapacity;
+            Additional = additional;
+        }
+
+        /// <inheritdoc/>
+        public override bool Equals(object obj) => Equals(obj as WriteMajorityPlus);
+
+        public override string ToString() => $"WriteMajorityPlus(timeout={Timeout})";
+
+        public bool Equals(WriteMajorityPlus other)
+        {
+            if (ReferenceEquals(null, other)) return false;
+            if (ReferenceEquals(this, other)) return true;
+            return Timeout.Equals(other.Timeout) && MinCapacity == other.MinCapacity;
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return (Timeout.GetHashCode() * 397) ^ MinCapacity;
+            }
+        }
+    }
+
     public sealed class WriteAll : IWriteConsistency, IEquatable<WriteAll>
     {
         public TimeSpan Timeout { get; }

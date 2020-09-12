@@ -174,6 +174,8 @@ namespace Akka.Cluster.Sharding
                                 regions: Regions.SetItem(region, shardRegions.Where(s => s != message.Shard).ToImmutableList()),
                                 unallocatedShards: newUnallocatedShards);
                         }
+                    case ShardCoordinatorInitialized _:
+                        return this;
                 }
 
                 return this;
@@ -1223,6 +1225,19 @@ namespace Akka.Cluster.Sharding
         /// TBD
         /// </summary>
         [Serializable]
+        public sealed class ShardCoordinatorInitialized : IDomainEvent
+        {
+            /// <summary>
+            /// TBD
+            /// </summary>
+            public static readonly ShardCoordinatorInitialized Instance = new ShardCoordinatorInitialized();
+            private ShardCoordinatorInitialized() { }
+        }
+
+        /// <summary>
+        /// TBD
+        /// </summary>
+        [Serializable]
         public sealed class StateInitialized
         {
             /// <summary>
@@ -1340,7 +1355,9 @@ namespace Akka.Cluster.Sharding
                             if (CurrentState.Regions.ContainsKey(regionTerminated.Region))
                                 CurrentState = CurrentState.Updated(evt);
                             else
-                                Log.Debug("ShardRegionTerminated but region {0} was not registered", regionTerminated.Region);
+                                Log.Debug("ShardRegionTerminated, but region {0} was not registered. This inconsistency is due to that " +
+                                    " some stored IActorRef did not contain full address information. It will be removed by later watch.",
+                                    regionTerminated.Region);
                             return true;
                         case ShardRegionProxyTerminated proxyTerminated:
                             if (CurrentState.RegionProxies.Contains(proxyTerminated.RegionProxy))
@@ -1351,6 +1368,8 @@ namespace Akka.Cluster.Sharding
                             return true;
                         case ShardHomeDeallocated _:
                             CurrentState = CurrentState.Updated(evt);
+                            return true;
+                        case ShardCoordinatorInitialized _: // not used here
                             return true;
                     }
                     return false;
@@ -1399,10 +1418,19 @@ namespace Akka.Cluster.Sharding
             switch (message)
             {
                 case Terminate _:
-                    Log.Debug("Received termination message before state was initialized");
-                    Context.Stop(Self);
-                    return true;
-
+                    {
+                        if (RebalanceInProgress.IsEmpty)
+                        {
+                            Log.Debug("Received termination message.");
+                        }
+                        else
+                        {
+                            Log.Debug("Received termination message. Rebalance in progress of shards [{0}].", 
+                                string.Join(",", RebalanceInProgress.Keys.ToArray()));
+                        }
+                        Context.Stop(Self);
+                        return true;
+                    }
                 case StateInitialized _:
                     this.StateInitialized();
                     Context.Become(msg => this.Active(msg) || HandleSnapshotResult(msg));

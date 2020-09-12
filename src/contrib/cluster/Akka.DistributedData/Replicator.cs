@@ -356,8 +356,7 @@ namespace Akka.DistributedData
             _maxDeltaSize = settings.MaxDeltaSize;
 
             if (_cluster.IsTerminated) throw new ArgumentException("Cluster node must not be terminated");
-            if (!string.IsNullOrEmpty(_settings.Role) && !_cluster.SelfRoles.Contains(_settings.Role))
-                throw new ArgumentException($"The cluster node {_selfAddress} does not have the role {_settings.Role}");
+            if (_settings.Roles.Except(_cluster.SelfRoles).Count > 0) throw new ArgumentException($"The cluster node [{_selfAddress}] doesn't have all the roles [{string.Join(",", _settings.Roles)}]");
 
             _gossipTask = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(_settings.GossipInterval, _settings.GossipInterval, Self, GossipTick.Instance, Self);
             _notifyTask = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(_settings.NotifySubscribersInterval, _settings.NotifySubscribersInterval, Self, FlushChanges.Instance, Self);

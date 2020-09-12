@@ -16,7 +16,7 @@ namespace Akka.Cluster.Sharding
 {
     internal sealed class DDataShardCoordinator : ActorBase, IShardCoordinator, IWithUnboundedStash
     {
-        internal static Props Props(string typeName, ClusterShardingSettings settings, IShardAllocationStrategy allocationStrategy, IActorRef replicator, int majorityMinCap, bool rememberEntities) => 
+        internal static Props Props(string typeName, ClusterShardingSettings settings, IShardAllocationStrategy allocationStrategy, IActorRef replicator, int majorityMinCap, bool rememberEntities) =>
             Actor.Props.Create(() => new DDataShardCoordinator(typeName, settings, allocationStrategy, replicator, majorityMinCap, rememberEntities)).WithDeploy(Deploy.Local);
 
         public PersistentShardCoordinator.State CurrentState { get; set; }
@@ -37,8 +37,10 @@ namespace Akka.Cluster.Sharding
         public IStash Stash { get; set; }
         public int MinMembers { get; }
 
-        private readonly IReadConsistency _readConsistency;
-        private readonly IWriteConsistency _writeConsistency;
+        private readonly IReadConsistency _stateReadConsistency;
+        private readonly IWriteConsistency _stateWriteConsistency;
+        private readonly IReadConsistency _allShardsReadConsistency;
+        private readonly IWriteConsistency _allShardsWriteConsistency;
         private readonly LWWRegisterKey<PersistentShardCoordinator.State> _coordinatorStateKey;
         private readonly GSetKey<string> _allShardsKey;
         private readonly IActorRef _replicator;
@@ -64,8 +66,17 @@ namespace Akka.Cluster.Sharding
                 : Cluster.Settings.MinNrOfMembersOfRole.GetValueOrDefault(settings.Role, 1);
             RebalanceTask = Context.System.Scheduler.ScheduleTellRepeatedlyCancelable(Settings.TunningParameters.RebalanceInterval, Settings.TunningParameters.RebalanceInterval, Self, RebalanceTick.Instance, Self);
 
-            _readConsistency = new ReadMajority(settings.TunningParameters.WaitingForStateTimeout, majorityMinCap);
-            _writeConsistency = new WriteMajority(settings.TunningParameters.UpdatingStateTimeout, majorityMinCap);
+            _stateReadConsistency = (settings.TunningParameters.CoordinatorStateReadMajorityPlus == int.MaxValue)
+                ? new ReadAll(settings.TunningParameters.WaitingForStateTimeout)
+                : (IReadConsistency)new ReadMajorityPlus(settings.TunningParameters.WaitingForStateTimeout, majorityMinCap);
+
+            _stateWriteConsistency = (settings.TunningParameters.CoordinatorStateWriteMajorityPlus == int.MaxValue)
+                ? new WriteAll(settings.TunningParameters.WaitingForStateTimeout)
+                : (IWriteConsistency)new WriteMajorityPlus(settings.TunningParameters.WaitingForStateTimeout, majorityMinCap);
+
+            _allShardsReadConsistency = new ReadMajority(settings.TunningParameters.WaitingForStateTimeout, majorityMinCap);
+            _allShardsWriteConsistency = new WriteMajority(settings.TunningParameters.WaitingForStateTimeout, majorityMinCap);
+
             _coordinatorStateKey = new LWWRegisterKey<PersistentShardCoordinator.State>(typeName + "CoordinatorState");
             _allShardsKey = new GSetKey<string>($"shard-{typeName}-all");
             _allKeys = rememberEntities
@@ -116,7 +127,8 @@ namespace Akka.Cluster.Sharding
                     }
                 case GetFailure failure when _coordinatorStateKey.Equals(failure.Key):
                     {
-                        Log.Error("The ShardCoordinator was unable to get an initial state within 'waiting-for-state-timeout': {0} (retrying)", _readConsistency.Timeout);
+                        Log.Error("The ShardCoordinator was unable to get an initial state within 'waiting-for-state-timeout': {0} (retrying)",
+                            _stateReadConsistency.Timeout);
                         GetCoordinatorState(); // repeat until GetSuccess
                         return true;
                     }
@@ -143,7 +155,8 @@ namespace Akka.Cluster.Sharding
                     }
                 case GetFailure failure when _allShardsKey.Equals(failure.Key):
                     {
-                        Log.Error("The ShardCoordinator was unable to get all shards state within 'waiting-for-state-timeout': {0} (retrying)", _readConsistency.Timeout);
+                        Log.Error("The ShardCoordinator was unable to get all shards state within 'waiting-for-state-timeout': {0} (retrying)",
+                            _allShardsReadConsistency.Timeout);
                         // repeat until GetSuccess
                         GetAllShards();
                         return true;
@@ -160,6 +173,12 @@ namespace Akka.Cluster.Sharding
                 case Terminate _:
                     Log.Debug("Received termination message while waiting for state");
                     Context.Stop(Self);
+                    return true;
+                case PersistentShardCoordinator.Register reg:
+                    Log.Error("ShardRegion tried to register but ShardCoordinator not initialized yet: [{0}]", reg.ShardRegion);
+                    return true;
+                case PersistentShardCoordinator.RegisterProxy regProxy:
+                    Log.Error("ShardRegion proxy tried to register but ShardCoordinator not initialized yet: [{0}]", regProxy.ShardRegionProxy);
                     return true;
 
                 default: return this.ReceiveTerminated(message);
@@ -208,12 +227,14 @@ namespace Akka.Cluster.Sharding
                         var newRemainingKeys = remainingKeys.Remove(_coordinatorStateKey);
                         if (newRemainingKeys.IsEmpty)
                             UnbecomeAfterUpdate(e, afterUpdateCallback);
-                        else 
+                        else
                             Context.Become(WaitingForUpdate(e, afterUpdateCallback, newRemainingKeys));
                         return true;
 
                     case UpdateTimeout timeout when timeout.Key.Equals(_coordinatorStateKey) && timeout.Request.Equals(e):
-                        Log.Error("The ShardCoordinator was unable to update a distributed state within 'updating-state-timeout': {0} ({1}), event={2}", _writeConsistency.Timeout, _terminating ? "terminating" : "retrying", e);
+                        Log.Error("The ShardCoordinator was unable to update shards distributed state within 'updating-state-timeout': {0} ({1})." +
+                            "Perhaps the ShardRegion has not started on all active nodes yet?, event={2}",
+                            _stateWriteConsistency.Timeout, _terminating ? "terminating" : "retrying", e);
 
                         if (_terminating)
                         {
@@ -237,7 +258,8 @@ namespace Akka.Cluster.Sharding
                         return true;
 
                     case UpdateTimeout timeout when timeout.Key.Equals(_allShardsKey) && timeout.Request is string newShard:
-                        Log.Error("The ShardCoordinator was unable to update shards distributed state within 'updating-state-timeout': {0} ({1}), event={2}", _writeConsistency.Timeout, _terminating ? "terminating" : "retrying", e);
+                        Log.Error("The ShardCoordinator was unable to update shards distributed state within 'updating-state-timeout': {0} ({1}), event={2}", 
+                            _allShardsWriteConsistency.Timeout, _terminating ? "terminating" : "retrying", e);
 
                         if (_terminating)
                         {
@@ -246,7 +268,7 @@ namespace Akka.Cluster.Sharding
                         else
                         {
                             // repeat until UpdateSuccess
-                            SendShardsUpdate(newShard);
+                            SendAllShardsUpdate(newShard);
                         }
 
                         return true;
@@ -266,7 +288,7 @@ namespace Akka.Cluster.Sharding
                         return true;
 
                     case PersistentShardCoordinator.GetShardHome getShardHome:
-                        if (!this.HandleGetShardHome(getShardHome)) 
+                        if (!this.HandleGetShardHome(getShardHome))
                             Stash.Stash();
                         return true;
 
@@ -311,7 +333,7 @@ namespace Akka.Cluster.Sharding
             switch ((PersistentShardCoordinator.IDomainEvent)e)
             {
                 case PersistentShardCoordinator.ShardHomeAllocated allocated when _rememberEntities && !_shards.Contains(allocated.Shard):
-                    SendShardsUpdate(allocated.Shard);
+                    SendAllShardsUpdate(allocated.Shard);
                     Context.BecomeStacked(WaitingForUpdate(e, handler, _allKeys));
                     break;
                 default:
@@ -321,17 +343,18 @@ namespace Akka.Cluster.Sharding
             }
         }
 
-        private void SendShardsUpdate(string newShard)
+        private void SendAllShardsUpdate(string newShard)
         {
-            _replicator.Tell(Dsl.Update(_allShardsKey, GSet<string>.Empty, _writeConsistency, newShard, set => set.Add(newShard)));
+            _replicator.Tell(Dsl.Update(_allShardsKey, GSet<string>.Empty, _allShardsWriteConsistency, newShard, set => set.Add(newShard)));
         }
 
         private void SendCoordinatorStateUpdate(PersistentShardCoordinator.IDomainEvent e)
         {
             var s = CurrentState.Updated(e);
+            Log.Debug("Storing new coordinator state [{0}]", CurrentState);
             _replicator.Tell(Dsl.Update(_coordinatorStateKey,
                 new LWWRegister<PersistentShardCoordinator.State>(Cluster.SelfUniqueAddress, PersistentShardCoordinator.State.Empty),
-                _writeConsistency,
+                _stateWriteConsistency,
                 e,
                 reg => reg.WithValue(Cluster.SelfUniqueAddress, s)));
         }
@@ -339,9 +362,9 @@ namespace Akka.Cluster.Sharding
         private void GetAllShards()
         {
             if (_rememberEntities)
-                _replicator.Tell(Dsl.Get(_allShardsKey, _readConsistency));
+                _replicator.Tell(Dsl.Get(_allShardsKey, _allShardsReadConsistency));
         }
 
-        private void GetCoordinatorState() => _replicator.Tell(Dsl.Get(_coordinatorStateKey, _readConsistency));
+        private void GetCoordinatorState() => _replicator.Tell(Dsl.Get(_coordinatorStateKey, _stateReadConsistency));
     }
 }

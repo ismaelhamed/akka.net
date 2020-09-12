@@ -219,6 +219,47 @@ namespace Akka.DistributedData
         }
     }
 
+    /// <summary>
+    /// `ReadMajority` but with the given number of `additional` nodes added to the majority count. At most all nodes.
+    /// </summary>
+    public sealed class ReadMajorityPlus : IReadConsistency, IEquatable<ReadMajorityPlus>
+    {
+        public TimeSpan Timeout { get; }
+        public int Additional { get; }
+        public int MinCapacity { get; }
+
+        public ReadMajorityPlus(TimeSpan timeout, int additional, int minCapacity = 0)
+        {
+            Timeout = timeout;
+            Additional = additional;
+            MinCapacity = minCapacity;
+        }
+
+        /// <inheritdoc/>
+        public override bool Equals(object obj) =>
+            obj is ReadMajorityPlus readMajorityPlus && Equals(readMajorityPlus);
+
+        /// <inheritdoc/>
+        public override string ToString() => $"ReadMajorityPlus(timeout={Timeout})";
+
+        /// <inheritdoc/>
+        public bool Equals(ReadMajorityPlus other)
+        {
+            if (ReferenceEquals(null, other)) return false;
+            if (ReferenceEquals(this, other)) return true;
+            return Timeout.Equals(other.Timeout) && Additional == other.Additional && MinCapacity == other.MinCapacity;
+        }
+
+        /// <inheritdoc/>
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return (Timeout.GetHashCode() * 397) ^ MinCapacity;
+            }
+        }
+    }
+
     public sealed class ReadAll : IReadConsistency, IEquatable<ReadAll>
     {
         public TimeSpan Timeout { get; }
