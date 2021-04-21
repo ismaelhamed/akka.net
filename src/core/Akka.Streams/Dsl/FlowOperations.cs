@@ -1800,6 +1800,31 @@ namespace Akka.Streams.Dsl
         {
             return (Flow<TIn, TOut, TMat>)InternalFlowOperations.AlsoTo(flow, that);
         }
+        
+        /// <summary>
+        /// <para>
+        /// Attaches the given <seealso cref="Sink{TIn,TMat}"/> to this <see cref="IFlow{TOut,TMat}"/>, as a wire tap, meaning that elements that pass
+        /// through will also be sent to the wire-tap Sink, without the latter affecting the mainline flow.
+        /// If the wire-tap Sink backpressures, elements that would've been sent to it will be dropped instead.
+        /// </para>
+        /// <para>Emits when element is available and demand exists from the downstream; the element will also be sent to the wire-tap Sink if there is demand.</para>
+        /// <para>Backpressures when downstream ackpressures</para>
+        /// <para>Completes when upstream completes</para>
+        /// <para>Cancels when downstream cancels</para>
+        /// </summary>
+        public static Flow<TIn, TOut, TMat> WireTap<TIn, TOut, TMat>(this Flow<TIn, TOut, TMat> flow, IGraph<SinkShape<TOut>, TMat> that) => 
+            (Flow<TIn, TOut, TMat>)InternalFlowOperations.WireTap(flow, that);
+
+        /// <summary>
+        /// Attaches the given <seealso cref="Sink{TIn,TMat}"/> to this <see cref="IFlow{TOut,TMat}"/>, as a wire tap, meaning that elements that pass
+        /// through will also be sent to the wire-tap Sink, without the latter affecting the mainline flow.
+        /// If the wire-tap Sink backpressures, elements that would've been sent to it will be dropped instead..
+        /// 
+        /// It is recommended to use the internally optimized <seealso cref="Keep.Left{TLeft,TRight}"/> and <seealso cref="Keep.Right{TLeft,TRight}"/> combiners
+        /// where appropriate instead of manually writing functions that pass through one of the values.
+        /// </summary>
+        public static Flow<TIn, TOut, TMat3> WireTapMaterialized<TIn, TOut, TMat, TMat2, TMat3>(this Flow<TIn, TOut, TMat> flow, IGraph<SinkShape<TOut>, TMat2> that, Func<TMat, TMat2, TMat3> materializerFunction) =>
+            (Flow<TIn, TOut, TMat3>)InternalFlowOperations.WireTapMaterialized(flow, that, materializerFunction);
 
         ///<summary>
         /// Materializes to <see cref="Task{NotUsed}"/> that completes on getting termination message.

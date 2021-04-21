@@ -471,7 +471,7 @@ namespace Akka.Streams.Dsl
         /// <param name="collector">TBD</param>
         /// <returns>TBD</returns>
         public static Source<TOut2, TMat> Collect<TOut1, TOut2, TMat>(
-            this Source<TOut1, TMat> flow, 
+            this Source<TOut1, TMat> flow,
             Func<TOut1, bool> isDefined,
             Func<TOut1, TOut2> collector)
         {
@@ -567,7 +567,7 @@ namespace Akka.Streams.Dsl
         /// <returns>TBD</returns>
         public static Source<T, TMat> LimitWeighted<T, TMat>(this Source<T, TMat> flow, long max, Func<T, long> costFunc)
         {
-            return (Source<T, TMat>) InternalFlowOperations.LimitWeighted(flow, max, costFunc);
+            return (Source<T, TMat>)InternalFlowOperations.LimitWeighted(flow, max, costFunc);
         }
 
         /// <summary>
@@ -660,7 +660,7 @@ namespace Akka.Streams.Dsl
         {
             return (Source<TOut2, TMat>)InternalFlowOperations.ScanAsync(flow, zero, scan);
         }
-        
+
         /// <summary>
         /// Similar to <see cref="Scan{TIn,TOut,TMat}"/> but only emits its result when the upstream completes,
         /// after which it also completes. Applies the given function <paramref name="fold"/> towards its current and next value,
@@ -1058,7 +1058,7 @@ namespace Akka.Streams.Dsl
         public static Source<TOut2, TMat> Batch<TOut, TOut2, TMat>(this Source<TOut, TMat> flow, long max,
             Func<TOut, TOut2> seed, Func<TOut2, TOut, TOut2> aggregate)
         {
-            return (Source<TOut2, TMat>) InternalFlowOperations.Batch(flow, max, seed, aggregate);
+            return (Source<TOut2, TMat>)InternalFlowOperations.Batch(flow, max, seed, aggregate);
         }
 
         ///  <summary>
@@ -1235,7 +1235,7 @@ namespace Akka.Streams.Dsl
         /// <returns>TBD</returns>
         public static SubFlow<TOut, TMat, IRunnableGraph<TMat>> GroupBy<TOut, TMat, TKey>(this Source<TOut, TMat> flow, int maxSubstreams, Func<TOut, TKey> groupingFunc)
         {
-            return flow.GroupBy(maxSubstreams, groupingFunc, (f, s) => ((Source<Source<TOut, NotUsed>, TMat>) f).To(s));
+            return flow.GroupBy(maxSubstreams, groupingFunc, (f, s) => ((Source<Source<TOut, NotUsed>, TMat>)f).To(s));
         }
 
         /// <summary>
@@ -1299,7 +1299,7 @@ namespace Akka.Streams.Dsl
         /// <returns>TBD</returns>
         public static SubFlow<TOut, TMat, IRunnableGraph<TMat>> SplitWhen<TOut, TMat>(this Source<TOut, TMat> flow, SubstreamCancelStrategy substreamCancelStrategy, Func<TOut, bool> predicate)
         {
-            return flow.SplitWhen(substreamCancelStrategy, predicate, (f, s) => ((Source<Source<TOut, NotUsed>, TMat>) f).To(s));
+            return flow.SplitWhen(substreamCancelStrategy, predicate, (f, s) => ((Source<Source<TOut, NotUsed>, TMat>)f).To(s));
         }
 
         /// <summary>
@@ -1367,7 +1367,7 @@ namespace Akka.Streams.Dsl
         /// <returns>TBD</returns>
         public static SubFlow<TOut, TMat, IRunnableGraph<TMat>> SplitAfter<TOut, TMat>(this Source<TOut, TMat> flow, SubstreamCancelStrategy substreamCancelStrategy, Func<TOut, bool> predicate)
         {
-            return flow.SplitAfter(substreamCancelStrategy, predicate, (f, s) => ((Source<Source<TOut, NotUsed>, TMat>) f).To(s));
+            return flow.SplitAfter(substreamCancelStrategy, predicate, (f, s) => ((Source<Source<TOut, NotUsed>, TMat>)f).To(s));
         }
 
         /// <summary>
@@ -1672,7 +1672,7 @@ namespace Akka.Streams.Dsl
             this Source<TOut, TMat> flow, IGraph<SinkShape<TOut>, TMat2> that,
             Func<TMat, TMat2, TMat3> materializerFunction)
         {
-            return (Source<TOut, TMat3>) InternalFlowOperations.AlsoToMaterialized(flow, that, materializerFunction);
+            return (Source<TOut, TMat3>)InternalFlowOperations.AlsoToMaterialized(flow, that, materializerFunction);
         }
 
         /// <summary>
@@ -1694,8 +1694,36 @@ namespace Akka.Streams.Dsl
         /// <returns>TBD</returns>
         public static Source<TOut, TMat> AlsoTo<TOut, TMat>(this Source<TOut, TMat> flow, IGraph<SinkShape<TOut>, TMat> that)
         {
-            return (Source<TOut, TMat>) InternalFlowOperations.AlsoTo(flow, that);
+            return (Source<TOut, TMat>)InternalFlowOperations.AlsoTo(flow, that);
         }
+        
+        /// <summary>
+        /// <para>
+        /// Attaches the given <seealso cref="Sink{TIn,TMat}"/> to this <see cref="IFlow{TOut,TMat}"/> as a wire tap, meaning that elements that pass
+        /// through will also be sent to the wire-tap Sink, without the latter affecting the mainline flow. If the wire-tap Sink backpressures,
+        /// elements that would've been sent to it will be dropped instead.
+        /// </para>
+        /// <para>It is similar to <seealso cref="AlsoTo{TOut,TMat}"/> which does backpressure instead of dropping elements.</para>
+        /// <para>Emits when element is available and demand exists from the downstream; the element will also be sent to the wire-tap Sink if there is demand.</para>
+        /// <para>Backpressures when downstream backpressures</para>
+        /// <para>Completes when upstream completes</para>
+        /// <para>Cancels when downstream cancels</para>
+        /// </summary>
+        public static Source<TOut, TMat> WireTap<TOut, TMat>(this Source<TOut, TMat> flow, IGraph<SinkShape<TOut>, TMat> that) =>
+            (Source<TOut, TMat>)InternalFlowOperations.WireTap(flow, that);
+
+        /// <summary>
+        /// <para>
+        /// Attaches the given <seealso cref="Sink{TIn,TMat}"/> to this <see cref="IFlow{TOut,TMat}"/>, as a wire tap, meaning that elements that pass
+        /// through will also be sent to the wire-tap Sink, without the latter affecting the mainline flow. If the wire-tap Sink backpressures,
+        /// elements that would've been sent to it will be dropped instead..
+        /// </para>
+        /// <para>It is similar to <seealso cref="AlsoToMaterialized{TOut,TMat,TMat2,TMat3}"/> which does backpressure instead of dropping elements.</para>
+        /// It is recommended to use the internally optimized <seealso cref="Keep.Left{TLeft,TRight}"/> and <seealso cref="Keep.Right{TLeft,TRight}"/> combiners
+        /// where appropriate instead of manually writing functions that pass through one of the values.
+        /// </summary>
+        public static Source<TOut, TMat3> WireTapMaterialized<TOut, TMat, TMat2, TMat3>(this Source<TOut, TMat> flow, IGraph<SinkShape<TOut>, TMat2> that, Func<TMat, TMat2, TMat3> materializerFunction) => 
+            (Source<TOut, TMat3>)InternalFlowOperations.WireTapMaterialized(flow, that, materializerFunction);
 
         ///<summary>
         /// Materializes to <see cref="Task{NotUsed}"/> that completes on getting termination message.
@@ -1714,7 +1742,7 @@ namespace Akka.Streams.Dsl
         /// <returns>TBD</returns>
         public static Source<TOut, TMat2> WatchTermination<TOut, TMat, TMat2>(this Source<TOut, TMat> flow, Func<TMat, Task, TMat2> materializerFunction)
         {
-            return (Source<TOut, TMat2>) InternalFlowOperations.WatchTermination(flow, materializerFunction);
+            return (Source<TOut, TMat2>)InternalFlowOperations.WatchTermination(flow, materializerFunction);
         }
 
         /// <summary>
@@ -2150,7 +2178,6 @@ namespace Akka.Streams.Dsl
             => (Source<T, TMat>)InternalFlowOperations.OrElse(flow, secondary);
 
 
-
         /// <summary>
         /// Provides a secondary source that will be consumed if this source completes without any
         /// elements passing by. As soon as the first element comes through this stream, the alternative
@@ -2185,7 +2212,7 @@ namespace Akka.Streams.Dsl
         public static SourceWithContext<TCtx, TOut, TMat> AsSourceWithContext<TCtx, TOut, TMat>(
             this Source<TOut, TMat> flow, Func<TOut, TCtx> fn) =>
             new SourceWithContext<TCtx, TOut, TMat>(flow.Select(x => (x, fn(x))));
-      
+
         /// <summary>
         /// The operator fails with an <see cref="WatchedActorTerminatedException"/> if the target actor is terminated.
         /// 

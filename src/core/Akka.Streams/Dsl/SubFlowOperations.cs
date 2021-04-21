@@ -14,7 +14,6 @@ using Akka.IO;
 using Akka.Streams.Dsl.Internal;
 using Akka.Streams.Stage;
 using Akka.Streams.Supervision;
-using Akka.Streams.Util;
 using Akka.Util;
 
 // ReSharper disable UnusedMember.Global
@@ -1528,6 +1527,21 @@ namespace Akka.Streams.Dsl
         {
             return (SubFlow<TOut, TMat, TClosed>) InternalFlowOperations.AlsoTo(flow, that);
         }
+        
+        /// <summary>
+        /// <para>
+        /// Attaches the given <seealso cref="Sink{TIn,TMat}"/> to this <see cref="IFlow{TOut,TMat}"/>, as a wire tap, meaning that elements that pass
+        /// through will also be sent to the wire-tap Sink, without the latter affecting the mainline flow. If the wire-tap Sink backpressures,
+        /// elements that would've been sent to it will be dropped instead.
+        /// </para>
+        /// <para>It is similar to <seealso cref="AlsoTo{TOut,TMat,TClosed}"/> which does backpressure instead of dropping elements.</para>
+        /// <para>Emits when element is available and demand exists from the downstream; the element will also be sent to the wire-tap Sink if there is demand.</para>
+        /// <para>Backpressures when downstream backpressures</para>
+        /// <para>Completes when upstream completes</para>
+        /// <para>Cancels when downstream cancels</para>
+        /// </summary>
+        public static SubFlow<TOut, TMat, TClosed> WireTap<TOut, TMat, TClosed>(this SubFlow<TOut, TMat, TClosed> flow, IGraph<SinkShape<TOut>, TMat> that) => 
+            (SubFlow<TOut, TMat, TClosed>) InternalFlowOperations.WireTap(flow, that);
 
         ///<summary>
         /// Materializes to <see cref="Task{NotUsed}"/> that completes on getting termination message.

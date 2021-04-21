@@ -2436,6 +2436,52 @@ namespace Akka.Streams.Dsl.Internal
             });
         }
 
+        /// <summary>
+        /// <para>
+        /// Attaches the given <seealso cref="Sink{TIn,TMat}"/> to this <see cref="IFlow{TOut,TMat}"/> as a wire tap, meaning that elements that pass
+        /// through will also be sent to the wire-tap Sink, without the latter affecting the mainline flow. If the wire-tap Sink backpressures,
+        /// elements that would've been sent to it will be dropped instead.
+        /// </para>
+        /// <para>It is similar to <seealso cref="AlsoToMaterialized{TOut,TMat,TMat2,TMat3}"/> which does backpressure instead of dropping elements.</para>
+        /// <para>@see <seealso cref="WireTap{TOut,TMat}"/></para>
+        /// <para>
+        /// It is recommended to use the internally optimized <seealso cref="Keep.Left{TLeft,TRight}"/> and <seealso cref="Keep.Right{TLeft,TRight}"/> combiners
+        /// where appropriate instead of manually writing functions that pass through one of the values.
+        /// </para>
+        /// </summary>
+        public static IFlow<TOut, TMat3> WireTapMaterialized<TOut, TMat, TMat2, TMat3>(this IFlow<TOut, TMat> flow, IGraph<SinkShape<TOut>, TMat2> that, Func<TMat, TMat2, TMat3> materializerFunction) => 
+            flow.ViaMaterialized(WireTapGraph(that), materializerFunction);
+
+        /// <summary>
+        /// <para>
+        /// Attaches the given <seealso cref="Sink{TIn,TMat}"/> to this <see cref="IFlow{TOut,TMat}"/> as a wire tap, meaning that elements that pass
+        /// through will also be sent to the wire-tap Sink, without the latter affecting the mainline flow. If the wire-tap Sink backpressures,
+        /// elements that would've been sent to it will be dropped instead.
+        /// </para>
+        /// <para>It is similar to <seealso cref="AlsoTo{TOut,TMat}"/> which does backpressure instead of dropping elements.</para>
+        /// <para>Emits when element is available and demand exists from the downstream; the element will also be sent to the wire-tap Sink if there is demand.</para>
+        /// <para>Backpressures when downstream backpressures</para>
+        /// <para>Completes when upstream completes</para>
+        /// <para>Cancels when downstream cancels</para>
+        /// </summary>
+        /// <typeparam name="TOut">TBD</typeparam>
+        /// <typeparam name="TMat">TBD</typeparam>
+        /// <param name="flow">TBD</param>
+        /// <param name="that">TBD</param>
+        /// <returns>TBD</returns>
+        public static IFlow<TOut, TMat> WireTap<TOut, TMat>(this IFlow<TOut, TMat> flow, IGraph<SinkShape<TOut>, TMat> that) => 
+            flow.Via(WireTapGraph(that));
+
+        private static IGraph<FlowShape<TOut, TOut>, TMat> WireTapGraph<TOut, TMat>(IGraph<SinkShape<TOut>, TMat> that)
+        {
+            return GraphDsl.Create(that, (b, r) =>
+            {
+                var writeTap = b.Add(Dsl.WireTap.Create<TOut>());
+                b.From(writeTap.Out1).To(r);
+                return new FlowShape<TOut, TOut>(writeTap.In, writeTap.Out0);
+            });
+        }
+
         ///<summary>
         /// Materializes to <see cref="Task{NotUsed}"/> that completes on getting termination message.
         /// The task completes with success when received complete message from upstream or cancel
