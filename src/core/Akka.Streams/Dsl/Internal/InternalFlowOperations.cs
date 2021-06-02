@@ -1277,7 +1277,7 @@ namespace Akka.Streams.Dsl.Internal
             this IFlow<T, TMat> flow,
             int maxSubstreams,
             Func<T, TKey> groupingFunc,
-            Func<IFlow<Source<T, NotUsed>, TMat>, Sink<Source<T, NotUsed>, Task>, TClosed> toFunc)
+            Func<IFlow<Source<T, NotUsed>, TMat>, Sink<Source<T, NotUsed>, Task<Done>>, TClosed> toFunc)
         {
             var merge = new GroupByMergeBack<T, TMat, TKey>(flow, maxSubstreams, groupingFunc);
 
@@ -1396,7 +1396,7 @@ namespace Akka.Streams.Dsl.Internal
         /// <returns>TBD</returns>
         public static SubFlow<T, TMat, TClosed> SplitWhen<T, TMat, TClosed>(this IFlow<T, TMat> flow,
             SubstreamCancelStrategy substreamCancelStrategy, Func<T, bool> predicate,
-            Func<IFlow<Source<T, NotUsed>, TMat>, Sink<Source<T, NotUsed>, Task>, TClosed> toFunc)
+            Func<IFlow<Source<T, NotUsed>, TMat>, Sink<Source<T, NotUsed>, Task<Done>>, TClosed> toFunc)
         {
             var merge = new SplitWhenMergeBack<T, TMat>(flow, predicate, substreamCancelStrategy);
 
@@ -1501,7 +1501,7 @@ namespace Akka.Streams.Dsl.Internal
         /// <returns>TBD</returns>
         public static SubFlow<T, TMat, TClosed> SplitAfter<T, TMat, TClosed>(this IFlow<T, TMat> flow,
             SubstreamCancelStrategy substreamCancelStrategy, Func<T, bool> predicate,
-            Func<IFlow<Source<T, NotUsed>, TMat>, Sink<Source<T, NotUsed>, Task>, TClosed> toFunc)
+            Func<IFlow<Source<T, NotUsed>, TMat>, Sink<Source<T, NotUsed>, Task<Done>>, TClosed> toFunc)
         {
             var merge = new SplitAfterMergeBack<T, TMat>(flow, predicate, substreamCancelStrategy);
 
