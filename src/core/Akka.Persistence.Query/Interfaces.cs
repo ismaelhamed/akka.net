@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+using Akka.Annotations;
 using Akka.Streams.Dsl;
 
 namespace Akka.Persistence.Query
@@ -145,5 +146,46 @@ namespace Akka.Persistence.Query
         /// currently used `persistenceIds` is provided by <see cref="ICurrentPersistenceIdsQuery.CurrentPersistenceIds"/>.
         /// </summary>
         Source<string, NotUsed> PersistenceIds();
+    }
+
+    /// <summary>
+    /// Query API for reading durable state objects.
+    /// </summary>
+    [ApiMayChange]
+    public interface IDurableStateStoreQuery<T> // TODO: IDurableStateStore<T>
+    {
+        /// <summary>
+        /// Get a source of the most recent changes made to objects with the given tag since the passed in offset.
+        /// <para>
+        /// Note that this only returns the most recent change to each object, if an object has been updated multiple times
+        /// since the offset, only the most recent of those changes will be part of the stream.
+        /// </para>
+        /// <para>
+        /// This will return changes that occurred up to when the `Source` returned by this call is materialized. Changes to
+        /// objects made since materialization are not guaranteed to be included in the results.
+        /// </para>
+        /// <para>
+        /// The <see cref="DurableStateChange{T}"/> elements can be <seealso cref="UpdatedDurableState"/> or `DeletedDurableState`. 
+        /// `DeletedDurableState` is not implemented yet
+        /// </para>
+        /// </summary>
+        /// <param name="tag">The tag to get changes for.</param>
+        /// <param name="offset">The offset to get changes since. Must either be <see cref="NoOffset"/> to get changes since the beginning of time, or an offset that has been previously returned by this query. Any other offsets are invalid.</param>
+        /// <returns>A source of change in state.</returns>
+        Source<DurableStateChange<T>, NotUsed> CurrentChanges(string tag, Offset offset);
+
+        /// <summary>
+        /// Get a source of the most recent changes made to objects with the given tag since the passed in offset.
+        /// <para>The returned source will never terminate, it effectively watches for changes to the objects and emits changes as they happen.</para>
+        /// <para>
+        /// Not all changes that occur are guaranteed to be emitted, this call only guarantees that eventually, the most
+        /// recent change for each object since the offset will be emitted. In particular, multiple updates to a given object
+        /// in quick succession are likely to be skipped, with only the last update resulting in a change from this source.
+        /// </para>
+        /// </summary>
+        /// <param name="tag">The tag to get changes for.</param>
+        /// <param name="offset">The offset to get changes since. Must either be <see cref="NoOffset"/> to get changes since the beginning of time, or an offset that has been previously returned by this query. Any other offsets are invalid.</param>
+        /// <returns>A source of change in state.</returns>
+        Source<DurableStateChange<T>, NotUsed> Changes(string tag, Offset offset);
     }
 }

@@ -614,6 +614,9 @@ namespace Akka.Persistence
             return Context.CreateStash(GetType());
         }
 
+        /// <summary>
+        /// Stash a command to the internal stash buffer, which is used while waiting for persist to be completed.
+        /// </summary>
         private void StashInternally(object currentMessage)
         {
             try
