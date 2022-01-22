@@ -81,8 +81,6 @@ namespace Akka.Persistence.Tests.State
             {
                 _persistenceId = persistenceId;
                 _probe = probe;
-
-                DurableStateStorePluginId = "akka.persistence.state.inmem";
             }
 
             public override string PersistenceId => _persistenceId;
@@ -118,8 +116,6 @@ namespace Akka.Persistence.Tests.State
             {
                 _persistenceId = persistenceId;
                 _probe = probe;
-
-                DurableStateStorePluginId = "akka.persistence.state.inmem";
             }
 
             public override string PersistenceId => _persistenceId;

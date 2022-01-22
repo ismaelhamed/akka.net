@@ -20,6 +20,8 @@ namespace Akka.Persistence.State
     public class DurableStateStoreRegistry : IExtension
     {
         private readonly ExtendedActorSystem _system;
+        private readonly Config _systemConfig;
+        private readonly Lazy<string> _defaultPluginId;
         private readonly ConcurrentDictionary<string, IDurableStateStore> _plugins = new ConcurrentDictionary<string, IDurableStateStore>();
         private ILoggingAdapter _log;
 
@@ -29,33 +31,44 @@ namespace Akka.Persistence.State
         {
             _system = system;
             _system.Settings.InjectTopLevelFallback(Persistence.DefaultConfig());
+
+            _systemConfig = _system.Settings.Config;
+            _defaultPluginId = new Lazy<string>(() =>
+            {
+                var configPath = _systemConfig.GetString("akka.persistence.state.plugin");
+                PersistenceExtensions.VerifyPluginConfigIsDefined(configPath, "Default DurableStateStore");
+                PersistenceExtensions.VerifyPluginConfigExists(_systemConfig, configPath, "DurableStateStore");
+                return configPath;
+            });
         }
 
-        public static DurableStateStoreRegistry Get(ActorSystem system) => 
+        public static DurableStateStoreRegistry Get(ActorSystem system) =>
             system.WithExtension<DurableStateStoreRegistry, DurableStateStoreRegistryProvider>();
 
         /// <summary>
-        /// The provided durableStateStorePluginConfig will be used to configure the journal plugin instead of the actor system config.
+        /// The provided <paramref name="pluginId"/> will be used to configure the DurableStateStore plugin instead of the actor system config.
         /// </summary>
         /// <typeparam name="TStore">TBD</typeparam>
         /// <typeparam name="T">TBD</typeparam>
-        /// <param name="durableStateStorePluginId">TBD</param>
-        /// <returns>Returns the <see cref="IDurableStateStore{T}"/> specified by the given read journal configuration entry.</returns>
-        public TStore DurableStateStoreFor<TStore, T>(string durableStateStorePluginId) where TStore : IDurableStateStore<T> =>
-            DurableStateStoreFor<TStore, T>(durableStateStorePluginId, ConfigurationFactory.Empty);
+        /// <param name="pluginId">TBD</param>
+        /// <returns>Returns the <see cref="IDurableStateStore{T}"/> specified by the given configuration entry.</returns>
+        public TStore DurableStateStoreFor<TStore, T>(string pluginId) where TStore : IDurableStateStore<T> =>
+            PluginFor<TStore, T>(PluginIdOrDefault(pluginId), PluginConfig(pluginId));
 
-        /// <summary>
-        /// The provided durableStateStorePluginConfig will be used to configure the journal plugin instead of the actor system config.
-        /// </summary>
-        /// <typeparam name="TStore">TBD</typeparam>
-        /// <typeparam name="T">TBD</typeparam>
-        /// <param name="durableStateStorePluginId">TBD</param>
-        /// <param name="durableStateStorePluginConfig">TBD</param>
-        /// <returns>Returns the <see cref="IDurableStateStore{T}"/> specified by the given read journal configuration entry.</returns>
-        public TStore DurableStateStoreFor<TStore, T>(string durableStateStorePluginId, Config durableStateStorePluginConfig) where TStore : IDurableStateStore<T> =>
-            DurableStateStorePluginFor<TStore, T>(durableStateStorePluginId, durableStateStorePluginConfig);
+        private string PluginIdOrDefault(string pluginId)
+        {
+            var configPath = string.IsNullOrEmpty(pluginId) ? _defaultPluginId.Value : pluginId;
+            PersistenceExtensions.VerifyPluginConfigExists(_systemConfig, configPath, "DurableStateStore");
+            return configPath;
+        }
 
-        private TStore DurableStateStorePluginFor<TStore, T>(string pluginId, Config pluginConfig) where TStore : IDurableStateStore<T>
+        private Config PluginConfig(string pluginId)
+        {
+            var configPath = PluginIdOrDefault(pluginId);
+            return _systemConfig.GetConfig(configPath).WithFallback(_systemConfig.GetConfig("akka.persistence.state-plugin-fallback"));
+        }
+
+        private TStore PluginFor<TStore, T>(string pluginId, Config pluginConfig) where TStore : IDurableStateStore<T>
         {
             var plugin = _plugins.GetOrAdd(pluginId, path => CreatePlugin(path, pluginConfig).GetDurableStateStore<T>());
             return (TStore)plugin;

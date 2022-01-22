@@ -62,14 +62,11 @@ namespace Akka.Persistence.State.Internal
         private static Config DurableStateStoreConfigFor(Config config, string pluginId)
         {
             var defaultPluginId = config.GetString("akka.persistence.state.plugin");
-            if (string.IsNullOrEmpty(defaultPluginId))
-                throw new ArgumentNullException($"Default DurableStateStore plugin is not configured, see 'reference.conf'");
+            PersistenceExtensions.VerifyPluginConfigIsDefined(defaultPluginId, "Default DurableStateStore");
 
             var configPath = pluginId == "" ? defaultPluginId : pluginId;
-            if (!string.IsNullOrEmpty(configPath) && !config.HasPath(configPath))
-                throw new ArgumentNullException($"DurableStateStore plugin [{pluginId}] configuration doesn't exist.");
-
-            return config.GetConfig(configPath);
+            PersistenceExtensions.VerifyPluginConfigExists(config, configPath, "DurableStateStore");
+            return config.GetConfig(configPath).WithFallback(config.GetConfig("akka.persistence.state-plugin-fallback"));
         }
 
         public int StashCapacity { get; }
