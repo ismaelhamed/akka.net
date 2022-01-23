@@ -58,7 +58,7 @@ namespace Akka.Persistence.State.Internal
     {
         private static readonly AtomicCounter InstanceCounter = new AtomicCounter(1);
 
-        private readonly Lazy<IDurableStateUpdateStore<object>> _durableStateUpdateStore;
+        private readonly Lazy<IDurableStateUpdateStore> _durableStateUpdateStore;
         private readonly IStash _internalStash;
         internal DurableStateActorState _currentState;
         private bool _holdingRecoveryPermit;
@@ -91,9 +91,9 @@ namespace Akka.Persistence.State.Internal
             _currentRevision = 0L;
 
             Extension = Persistence.Instance.Apply(Context.System);
-            _durableStateUpdateStore = new Lazy<IDurableStateUpdateStore<object>>(() =>
+            _durableStateUpdateStore = new Lazy<IDurableStateUpdateStore>(() =>
                 DurableStateStoreRegistry.Get(Context.System)
-                    .DurableStateStoreFor<IDurableStateUpdateStore<object>, object>(Settings.DurableStateStorePluginId));
+                    .DurableStateStoreFor<IDurableStateUpdateStore, object>(Settings.DurableStateStorePluginId));
             _currentState = null;
             _internalStash = CreateStash();
         }
@@ -425,8 +425,8 @@ namespace Akka.Persistence.State.Internal
     [InternalApi]
     public sealed class GetSuccess : IInternalProtocol
     {
-        public GetObjectResult<object> Result { get; }
-        public GetSuccess(GetObjectResult<object> result) => Result = result;
+        public GetObjectResult Result { get; }
+        public GetSuccess(GetObjectResult result) => Result = result;
     }
 
     [InternalApi]

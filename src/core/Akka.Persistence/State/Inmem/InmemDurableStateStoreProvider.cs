@@ -11,6 +11,6 @@ namespace Akka.Persistence.State.Inmem
 {
     internal class InmemDurableStateStoreProvider : IDurableStateStoreProvider
     {
-        public IDurableStateStore<T> GetDurableStateStore<T>() => new InmemDurableStateStore<T>();
+        public IDurableStateStore GetDurableStateStore() => new InmemDurableStateStore();
     }
 }

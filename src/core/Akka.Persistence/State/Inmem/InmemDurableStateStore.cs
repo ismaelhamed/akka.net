@@ -12,9 +12,9 @@ using Akka.Util;
 
 namespace Akka.Persistence.State.Inmem
 {
-    internal class InmemDurableStateStore<T> : IDurableStateUpdateStore<T>
+    internal class InmemDurableStateStore : IDurableStateUpdateStore
     {
-        private readonly ConcurrentDictionary<string, T> _store = new ConcurrentDictionary<string, T>();
+        private readonly ConcurrentDictionary<string, object> _store = new ConcurrentDictionary<string, object>();
 
         public Task<Done> DeleteObject(string persistenceId)
         {
@@ -22,13 +22,13 @@ namespace Akka.Persistence.State.Inmem
             return Task.FromResult(Done.Instance);
         }
 
-        public Task<GetObjectResult<T>> GetObject(string persistenceId)
+        public Task<GetObjectResult> GetObject(string persistenceId)
         {
             _store.TryGetValue(persistenceId, out var result);
-            return Task.FromResult(new GetObjectResult<T>(result ?? Option<T>.None, 0));
+            return Task.FromResult(new GetObjectResult(result ?? Option<object>.None, 0));
         }
 
-        public Task<Done> UpsertObject(string persistenceId, long revision, T value, string tag)
+        public Task<Done> UpsertObject(string persistenceId, long revision, object value, string tag)
         {
             _store.AddOrUpdate(persistenceId, value, (_, __) => value);
             return Task.FromResult(Done.Instance);

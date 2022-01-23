@@ -152,7 +152,7 @@ namespace Akka.Persistence.Query
     /// Query API for reading durable state objects.
     /// </summary>
     [ApiMayChange]
-    public interface IDurableStateStoreQuery<T> // TODO: IDurableStateStore<T>
+    public interface IDurableStateStoreQuery // TODO: IDurableStateStore<T>
     {
         /// <summary>
         /// Get a source of the most recent changes made to objects with the given tag since the passed in offset.
@@ -165,14 +165,14 @@ namespace Akka.Persistence.Query
         /// objects made since materialization are not guaranteed to be included in the results.
         /// </para>
         /// <para>
-        /// The <see cref="DurableStateChange{T}"/> elements can be <seealso cref="UpdatedDurableState"/> or `DeletedDurableState`. 
+        /// The <see cref="DurableStateChange"/> elements can be <seealso cref="UpdatedDurableState"/> or `DeletedDurableState`. 
         /// `DeletedDurableState` is not implemented yet
         /// </para>
         /// </summary>
         /// <param name="tag">The tag to get changes for.</param>
         /// <param name="offset">The offset to get changes since. Must either be <see cref="NoOffset"/> to get changes since the beginning of time, or an offset that has been previously returned by this query. Any other offsets are invalid.</param>
         /// <returns>A source of change in state.</returns>
-        Source<DurableStateChange<T>, NotUsed> CurrentChanges(string tag, Offset offset);
+        Source<DurableStateChange, NotUsed> CurrentChanges(string tag, Offset offset);
 
         /// <summary>
         /// Get a source of the most recent changes made to objects with the given tag since the passed in offset.
@@ -186,6 +186,6 @@ namespace Akka.Persistence.Query
         /// <param name="tag">The tag to get changes for.</param>
         /// <param name="offset">The offset to get changes since. Must either be <see cref="NoOffset"/> to get changes since the beginning of time, or an offset that has been previously returned by this query. Any other offsets are invalid.</param>
         /// <returns>A source of change in state.</returns>
-        Source<DurableStateChange<T>, NotUsed> Changes(string tag, Offset offset);
+        Source<DurableStateChange, NotUsed> Changes(string tag, Offset offset);
     }
 }

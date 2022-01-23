@@ -51,8 +51,8 @@ namespace Akka.Persistence.State
         /// <typeparam name="TStore">TBD</typeparam>
         /// <typeparam name="T">TBD</typeparam>
         /// <param name="pluginId">TBD</param>
-        /// <returns>Returns the <see cref="IDurableStateStore{T}"/> specified by the given configuration entry.</returns>
-        public TStore DurableStateStoreFor<TStore, T>(string pluginId) where TStore : IDurableStateStore<T> =>
+        /// <returns>Returns the <see cref="IDurableStateStore"/> specified by the given configuration entry.</returns>
+        public TStore DurableStateStoreFor<TStore, T>(string pluginId) where TStore : IDurableStateStore =>
             PluginFor<TStore, T>(PluginIdOrDefault(pluginId), PluginConfig(pluginId));
 
         private string PluginIdOrDefault(string pluginId)
@@ -68,9 +68,9 @@ namespace Akka.Persistence.State
             return _systemConfig.GetConfig(configPath).WithFallback(_systemConfig.GetConfig("akka.persistence.state-plugin-fallback"));
         }
 
-        private TStore PluginFor<TStore, T>(string pluginId, Config pluginConfig) where TStore : IDurableStateStore<T>
+        private TStore PluginFor<TStore, T>(string pluginId, Config pluginConfig) where TStore : IDurableStateStore
         {
-            var plugin = _plugins.GetOrAdd(pluginId, path => CreatePlugin(path, pluginConfig).GetDurableStateStore<T>());
+            var plugin = _plugins.GetOrAdd(pluginId, path => CreatePlugin(path, pluginConfig).GetDurableStateStore());
             return (TStore)plugin;
         }
 

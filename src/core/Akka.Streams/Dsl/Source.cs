@@ -49,6 +49,11 @@ namespace Akka.Streams.Dsl
         /// </summary>
         public SourceShape<TOut> Shape => (SourceShape<TOut>)Module.Shape;
 
+        public object Select()
+        {
+            throw new NotImplementedException();
+        }
+
         /// <summary>
         /// TBD
         /// </summary>

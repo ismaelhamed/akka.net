@@ -18,6 +18,6 @@ namespace Akka.Persistence.State
         /// The `ReadJournal` implementation for the Scala API.
         /// This corresponds to the instance that is returned by <see cref="DurableStateStoreRegistry.DurableStateStoreFor{TStore, T}(string)"/>
         /// </summary>
-        IDurableStateStore<T> GetDurableStateStore<T>();
+        IDurableStateStore GetDurableStateStore();
     }
 }

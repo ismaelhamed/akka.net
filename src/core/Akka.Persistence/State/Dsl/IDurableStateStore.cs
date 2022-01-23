@@ -10,26 +10,23 @@ using Akka.Util;
 
 namespace Akka.Persistence.State.Dsl
 {
-    public interface IDurableStateStore
-    { }
-
     /// <summary>
-    /// API for reading durable state objects. See also <seealso cref="IDurableStateUpdateStore{T}"/>
+    /// API for reading durable state objects. See also <seealso cref="IDurableStateUpdateStore"/>
     /// </summary>    
-    public interface IDurableStateStore<T> : IDurableStateStore
+    public interface IDurableStateStore
     {
-        Task<GetObjectResult<T>> GetObject(string persistenceId);
+        Task<GetObjectResult> GetObject(string persistenceId);
     }
 
-    public sealed class GetObjectResult<T>
+    public sealed class GetObjectResult
     {
-        public GetObjectResult(Option<T> value, long revision)
+        public GetObjectResult(Option<object> value, long revision)
         {
             Value = value;
             Revision = revision;
         }
 
-        public Option<T> Value { get; }
+        public Option<object> Value { get; }
         public long Revision { get; }
     }
 }

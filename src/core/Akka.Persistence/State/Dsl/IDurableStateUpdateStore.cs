@@ -12,7 +12,7 @@ namespace Akka.Persistence.State.Dsl
     /// <summary>
     /// API for updating durable state objects.
     /// </summary>
-    public interface IDurableStateUpdateStore<T> : IDurableStateStore<T> // TODO: probably should not be typed (object)
+    public interface IDurableStateUpdateStore : IDurableStateStore
     {
         /// <summary>
         /// TBD
@@ -21,6 +21,12 @@ namespace Akka.Persistence.State.Dsl
         /// <param name="revision">Revision number for optimistic locking. Starts at 1.</param>
         /// <param name="value">TBD</param>
         /// <param name="tag">TBD</param>
-        Task<Done> UpsertObject(string persistenceId, long revision, T value, string tag = null);
+        Task<Done> UpsertObject(string persistenceId, long revision, object value, string tag = null);
+
+        /// <summary>
+        /// TBD
+        /// </summary>
+        /// <param name="persistenceId">TBD</param>
+        Task<Done> DeleteObject(string persistenceId);
     }
 }
