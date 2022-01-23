@@ -13,21 +13,21 @@ namespace Akka.Persistence.Query
         /// Initializes a new instance of the <see cref="DurableStateChange{T}"/> class.
         /// </summary>
         /// <param name="persistenceId">The persistence id of the origin entity.</param>
-        /// <param name="seqNr">The sequence number from the origin entity.</param>
+        /// <param name="revision">TBD</param>
         /// <param name="value">The object value.</param>
         /// <param name="offset">The offset that can be used in next `changes` or `currentChanges` query.</param>
-        /// <param name="timestamp">The `timestamp` is the time the event was stored, in ticks. The value of this property represents the number of 100-nanosecond intervals that have elapsed since 12:00:00 midnight, January 1, 0001 in the Gregorian calendar (same as `DateTime.Now.Ticks`).</param>
-        public DurableStateChange(string persistenceId, long seqNr, T value, Offset offset, long timestamp)
+        /// <param name="timestamp">The time the event was stored, in ticks. The value of this property represents the number of 100-nanosecond intervals that have elapsed since 12:00:00 midnight, January 1, 0001 in the Gregorian calendar (same as `DateTime.Now.Ticks`).</param>
+        public DurableStateChange(string persistenceId, long revision, T value, Offset offset, long timestamp)
         {
             PersistenceId = persistenceId;
-            SeqNr = seqNr;
+            Revision = revision;
             Value = value;
             Offset = offset;
             Timestamp = timestamp;
         }
 
         public string PersistenceId { get; }
-        public long SeqNr { get; }
+        public long Revision { get; }
         public T Value { get; }
         public Offset Offset { get; }
         public long Timestamp { get; }

@@ -31,10 +31,10 @@ namespace Akka.Persistence.State.Internal
         /// Initializes a new instance of the <see cref="DurableStateStoreException"/> class.
         /// </summary>
         /// <param name="persistenceId">TBD</param>
-        /// <param name="sequenceNr">TBD</param>
+        /// <param name="revision">TBD</param>
         /// <param name="cause">The exception that is the cause of the current exception.</param>
-        public DurableStateStoreException(string persistenceId, long sequenceNr, Exception cause = null) 
-            : base($"Failed to persist state with sequence number [{sequenceNr}] for persistenceId [{persistenceId}]", cause)
+        public DurableStateStoreException(string persistenceId, long revision, Exception cause = null) 
+            : base($"Failed to persist state with revision [{revision}] for persistenceId [{persistenceId}]", cause)
         { }
     }
 }

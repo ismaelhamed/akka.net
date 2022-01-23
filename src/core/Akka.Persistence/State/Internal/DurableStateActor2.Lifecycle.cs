@@ -39,7 +39,7 @@ namespace Akka.Persistence.State.Internal
         /// <summary>
         /// Mutates start behaviour, by setting the holdingRecoveryPermit to false
         /// </summary>
-        private void ReturnRecoveryPermit(string reason)
+        private void ReturnRecoveryPermit(string reason = null)
         {
             // No need to return the permit
             if (!_holdingRecoveryPermit)

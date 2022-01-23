@@ -83,20 +83,19 @@ namespace Akka.Persistence.State.Internal
                 };
             }
 
-            void OnRecoveryCompleted(RecoveryState state)
+            void OnRecoveryCompleted(long revision, long recoveryStartTime)
             {
                 try
                 {
-                    if (Log.IsDebugEnabled) // TODO: correct place?
-                        Log.Debug("Recovery for persistenceId [{0}] took {1}", PersistenceId, DateTime.UtcNow.Ticks - state.RecoveryStartTime);
+                    if (Log.IsDebugEnabled)
+                        Log.Debug("Recovery for persistenceId [{0}] took {1}", PersistenceId, TimeSpan.FromTicks(DateTime.UtcNow.Ticks - recoveryStartTime));
 
                     OnReplaySuccess();
-
-                    var highestSeqNr = Math.Max(state.SeqNr, LastSequenceNr);
-                    _sequenceNr = highestSeqNr;
-                    LastSequenceNr = highestSeqNr;
-
                     recoveryRunning = false;
+
+                    var highestRevision = Math.Max(revision, LastRevision);
+                    _currentRevision = highestRevision;
+                    LastRevision = highestRevision;
 
                     try
                     {
@@ -145,13 +144,33 @@ namespace Akka.Persistence.State.Internal
             {
                 switch (message)
                 {
+                    //case ReplayedMessage replayed:
+                    //    try
+                    //    {
+                    //        UpdateLastSequenceNr(replayed.Persistent);
+                    //        base.AroundReceive(RecoveryBehavior, replayed.Persistent);
+                    //    }
+                    //    catch (Exception cause)
+                    //    {
+                    //        CancelRecoveryTimer();
+                    //        try
+                    //        {
+                    //            OnRecoveryFailure(cause);
+                    //        }
+                    //        finally
+                    //        {
+                    //            Context.Stop(Self);
+                    //        }
+                    //        ReturnRecoveryPermit();
+                    //    }
+                    //    break;
                     case GetSuccess success:
                         // TODO: retrieve state
                         // TODO?: SnapshotAdapter to migrate classis persistent actors, or emptyState (passed by constructor)
                         object state = null;
-                        Log.Debug("Recovered from seqNr [{0}]", success.Result.SeqNr);
+                        Log.Debug("Recovered from revision [{0}]", success.Result.Revision);
                         CancelRecoveryTimer();
-                        OnRecoveryCompleted(new RecoveryState(success.Result.SeqNr, state, DateTime.UtcNow.Ticks));
+                        OnRecoveryCompleted(success.Result.Revision, DateTime.UtcNow.Ticks);
                         break;
                     case GetFailure failure:
                         OnRecoveryFailed(failure.Cause);
@@ -197,14 +216,14 @@ namespace Akka.Persistence.State.Internal
                 }
             }
 
-            void OnUpsertSuccess(object stateToPersist, long seqNr)
+            void OnUpsertSuccess(object stateToPersist, long revision)
             {
                 if (Log.IsDebugEnabled)
                     Log.Debug("Received UpsertSuccess response after: {0} ticks", DateTime.UtcNow.Ticks - persistStartTime);
 
                 _isWriteInProgress = false;
 
-                UpdateLastSequenceNr(seqNr);
+                UpdateLastSequenceNr(revision);
                 try
                 {
                     PeekApplyHandler(stateToPersist);
@@ -217,13 +236,13 @@ namespace Akka.Persistence.State.Internal
                 }
             }
 
-            void OnUpsertFailed(Exception cause, object stateToPersist, long seqNr)
+            void OnUpsertFailed(Exception cause, object stateToPersist, long revision)
             {
                 _isWriteInProgress = false;
                 try
                 {
                     OnWriteMessageComplete(false);
-                    OnPersistFailure(new DurableStateStoreException(PersistenceId, seqNr, cause), stateToPersist);
+                    OnPersistFailure(new DurableStateStoreException(PersistenceId, revision, cause), stateToPersist);
                 }
                 finally
                 {
@@ -236,10 +255,10 @@ namespace Akka.Persistence.State.Internal
                 switch (message)
                 {
                     case UpsertSuccess success:
-                        OnUpsertSuccess(success.State, success.SeqNr);
+                        OnUpsertSuccess(success.State, success.Revision);
                         break;
                     case UpsertFailure failure:
-                        OnUpsertFailed(failure.Cause, failure.State, failure.SeqNr);
+                        OnUpsertFailed(failure.Cause, failure.State, failure.Revision);
                         break;
                     default:
                         StashInternally(message);
@@ -337,36 +356,36 @@ namespace Akka.Persistence.State.Internal
         }
     }
 
-    internal sealed class RecoveryState
-    {
-        public RecoveryState(long seqNr, object state, long recoveryStartTime)
-        {
-            SeqNr = seqNr;
-            State = state;
-            RecoveryStartTime = recoveryStartTime;
-        }
+    //internal sealed class RecoveryState
+    //{
+    //    public RecoveryState(long revision, object state, long recoveryStartTime)
+    //    {
+    //        Revision = revision;
+    //        State = state;
+    //        RecoveryStartTime = recoveryStartTime;
+    //    }
 
-        public long SeqNr { get; }
-        public object State { get; }
-        public long RecoveryStartTime { get; }
-    }
+    //    public long Revision { get; }
+    //    public object State { get; }
+    //    public long RecoveryStartTime { get; }
+    //}
 
-    internal sealed class RunningState
-    {
-        public RunningState(long seqNr, object state)
-        {
-            SeqNr = seqNr;
-            State = state;
-        }
+    //internal sealed class RunningState
+    //{
+    //    public RunningState(long revision, object state)
+    //    {
+    //        Revision = revision;
+    //        State = state;
+    //    }
 
-        public long SeqNr { get; }
-        public object State { get; }
+    //    public long Revision { get; }
+    //    public object State { get; }
 
-        public RunningState NextSequenceNr() => Copy(SeqNr + 1);
+    //    public RunningState NextSequenceNr() => Copy(Revision + 1);
 
-        public RunningState ApplyState(object updated) => Copy(state: updated);
+    //    public RunningState ApplyState(object updated) => Copy(state: updated);
 
-        private RunningState Copy(long? revision = null, object state = null) =>
-            new RunningState(revision ?? SeqNr, state ?? State);
-    }
+    //    private RunningState Copy(long? revision = null, object state = null) =>
+    //        new RunningState(revision ?? Revision, state ?? State);
+    //}
 }

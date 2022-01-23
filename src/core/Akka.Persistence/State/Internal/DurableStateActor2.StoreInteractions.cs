@@ -21,12 +21,12 @@ namespace Akka.Persistence.State.Internal
                     failure: exception => new GetFailure(exception));
         }
 
-        private void InternalUpsert(object value, long seqNr)
+        private void InternalUpsert(object value, long revision)
         {
-            _ = _durableStateUpdateStore.Value.UpsertObject(PersistenceId, seqNr, value)
+            _ = _durableStateUpdateStore.Value.UpsertObject(PersistenceId, revision, value /* TODO: tag */)
                 .PipeTo(Self,
-                    success: state => new UpsertSuccess(value, seqNr), // TODO: UpsertSuccess.Instance
-                    failure: exception => new UpsertFailure(exception, value, seqNr));  // TODO: new UpsertFailure(exception);
+                    success: state => new UpsertSuccess(value, revision), // TODO: UpsertSuccess.Instance
+                    failure: exception => new UpsertFailure(exception, value, revision));  // TODO: new UpsertFailure(exception);
         }
     }
 }

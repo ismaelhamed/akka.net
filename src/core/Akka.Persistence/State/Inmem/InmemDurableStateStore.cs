@@ -28,7 +28,7 @@ namespace Akka.Persistence.State.Inmem
             return Task.FromResult(new GetObjectResult<T>(result ?? Option<T>.None, 0));
         }
 
-        public Task<Done> UpsertObject(string persistenceId, long seqNr, T value, string tag)
+        public Task<Done> UpsertObject(string persistenceId, long revision, T value, string tag)
         {
             _store.AddOrUpdate(persistenceId, value, (_, __) => value);
             return Task.FromResult(Done.Instance);

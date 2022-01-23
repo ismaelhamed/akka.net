@@ -66,7 +66,7 @@ namespace Akka.Persistence.State.Internal
         private IStash _stash;
 
         private bool _isWriteInProgress;
-        private long _sequenceNr;
+        private long _currentRevision;
         private LinkedList<DurableStateEnvelope> _eventBatch = new LinkedList<DurableStateEnvelope>();
         private ICollection<DurableStateEnvelope> _journalBatch = new List<DurableStateEnvelope>();
 
@@ -86,12 +86,12 @@ namespace Akka.Persistence.State.Internal
         /// </summary>
         protected DurableStateActor2()
         {
-            LastSequenceNr = 0L;
+            LastRevision = 0L;
             _isWriteInProgress = false;
-            _sequenceNr = 0L;
+            _currentRevision = 0L;
 
             Extension = Persistence.Instance.Apply(Context.System);
-            _durableStateUpdateStore = new Lazy<IDurableStateUpdateStore<object>>(() => 
+            _durableStateUpdateStore = new Lazy<IDurableStateUpdateStore<object>>(() =>
                 DurableStateStoreRegistry.Get(Context.System)
                     .DurableStateStoreFor<IDurableStateUpdateStore<object>, object>(Settings.DurableStateStorePluginId));
             _currentState = null;
@@ -128,10 +128,10 @@ namespace Akka.Persistence.State.Internal
         public bool IsRecoveryFinished => !IsRecovering;
 
         /// <summary>
-        /// Highest received sequence number so far or `0L` if this actor
-        /// hasn't replayed  or stored any persistent events yet.
+        /// Highest received revision so far or `0L` if this actor
+        /// hasn't replayed or stored any persistent events yet.
         /// </summary>
-        public long LastSequenceNr { get; private set; }
+        public long LastRevision { get; private set; }
 
         /// <summary>
         /// Recovery handler that receives persistent events during recovery. If a state snapshot has been captured and saved,
@@ -191,7 +191,7 @@ namespace Akka.Persistence.State.Internal
 
             _pendingStashingPersistInvocations++;
             _pendingInvocations.AddLast(new StashingHandlerInvocation(state, o => handler((TState)o)));
-            _eventBatch.AddFirst(new DurableStateEnvelope(state, PersistenceId, NextSequenceNr(), sender: Sender));
+            _eventBatch.AddFirst(new DurableStateEnvelope(state, PersistenceId, NextRevision(), sender: Sender));
         }
 
         /// <summary>
@@ -203,14 +203,8 @@ namespace Akka.Persistence.State.Internal
         /// Called whenever the state recovery fails. By default it log the errors.
         /// </summary>
         /// <param name="reason">Reason of failure</param>
-        /// <param name="message">Message that caused a failure</param>
-        protected virtual void OnRecoveryFailure(Exception reason, object message = null)
-        {
-            if (message != null)
-                Log.Error(reason, "Exception when recovering state [{0}] for persistenceId [{1}]", message.GetType(), PersistenceId);
-            else
-                Log.Error(reason, "Exception when recovering state for persistenceId [{0}]", PersistenceId);
-        }
+        protected virtual void OnRecoveryFailure(Exception reason) => 
+            Log.Error(reason, "Exception when recovering state for persistenceId [{0}]", PersistenceId);
 
         /// <summary>
         /// Called when persist fails. By default it logs the error.
@@ -286,10 +280,10 @@ namespace Akka.Persistence.State.Internal
 
         private void UpdateLastSequenceNr(long sequenceNr)
         {
-            if (sequenceNr > LastSequenceNr) LastSequenceNr = sequenceNr;
+            if (sequenceNr > LastRevision) LastRevision = sequenceNr;
         }
 
-        private long NextSequenceNr() => ++_sequenceNr;
+        private long NextRevision() => ++_currentRevision;
 
         private void FlushJournalBatch()
         {
@@ -381,7 +375,6 @@ namespace Akka.Persistence.State.Internal
                 // Internally, all messages are processed by unstashing them from
                 // the internal stash one-by-one. Hence, an unstashAll() from the
                 // user stash must be prepended to the internal stash.
-
                 _internalStash.Prepend(ClearStash());
             }
 
@@ -457,12 +450,12 @@ namespace Akka.Persistence.State.Internal
         //private UpsertSuccess() { }
 
         public object State { get; }
-        public long SeqNr { get; set; }
+        public long Revision { get; set; }
 
-        public UpsertSuccess(object state, long seqNr)
+        public UpsertSuccess(object state, long revision)
         {
             State = state;
-            SeqNr = seqNr;
+            Revision = revision;
         }
     }
 
@@ -471,13 +464,13 @@ namespace Akka.Persistence.State.Internal
     {
         public Exception Cause { get; }
         public object State { get; }
-        public long SeqNr { get; set; }
+        public long Revision { get; set; }
 
-        public UpsertFailure(Exception cause, object state, long seqNr)
+        public UpsertFailure(Exception cause, object state, long revision)
         {
             Cause = cause;
             State = state;
-            SeqNr = seqNr;
+            Revision = revision;
         }
     }
 

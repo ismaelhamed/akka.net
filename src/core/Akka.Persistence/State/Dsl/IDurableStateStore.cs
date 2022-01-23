@@ -23,13 +23,13 @@ namespace Akka.Persistence.State.Dsl
 
     public sealed class GetObjectResult<T>
     {
-        public GetObjectResult(Option<T> value, long seqNr)
+        public GetObjectResult(Option<T> value, long revision)
         {
             Value = value;
-            SeqNr = seqNr;
+            Revision = revision;
         }
 
         public Option<T> Value { get; }
-        public long SeqNr { get; }
+        public long Revision { get; }
     }
 }
