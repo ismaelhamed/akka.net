@@ -73,17 +73,7 @@ namespace Akka.Persistence.State.Internal
             StartRecoveryTimer();
             InternalGet();
 
-            bool RecoveryBehavior(object message)
-            {
-                Receive receiveRecover = ReceiveRecover;
-                return message switch
-                {
-                    RecoveryCompleted _ => receiveRecover(RecoveryCompleted.Instance),
-                    _ => false,
-                };
-            }
-
-            void OnRecoveryCompleted(long revision, long recoveryStartTime)
+            void OnRecoveryCompleted(object state, long revision, long recoveryStartTime)
             {
                 try
                 {
@@ -99,7 +89,7 @@ namespace Akka.Persistence.State.Internal
 
                     try
                     {
-                        base.AroundReceive(RecoveryBehavior, RecoveryCompleted.Instance);
+                        base.AroundReceive(ReceiveRecover, new RecoveryCompleted(state));
                     }
                     finally
                     {
@@ -144,33 +134,13 @@ namespace Akka.Persistence.State.Internal
             {
                 switch (message)
                 {
-                    //case ReplayedMessage replayed:
-                    //    try
-                    //    {
-                    //        UpdateLastSequenceNr(replayed.Persistent);
-                    //        base.AroundReceive(RecoveryBehavior, replayed.Persistent);
-                    //    }
-                    //    catch (Exception cause)
-                    //    {
-                    //        CancelRecoveryTimer();
-                    //        try
-                    //        {
-                    //            OnRecoveryFailure(cause);
-                    //        }
-                    //        finally
-                    //        {
-                    //            Context.Stop(Self);
-                    //        }
-                    //        ReturnRecoveryPermit();
-                    //    }
-                    //    break;
-                    case GetSuccess success:
+                   case GetSuccess success:
                         // TODO: retrieve state
                         // TODO?: SnapshotAdapter to migrate classis persistent actors, or emptyState (passed by constructor)
                         object state = null;
                         Log.Debug("Recovered from revision [{0}]", success.Result.Revision);
                         CancelRecoveryTimer();
-                        OnRecoveryCompleted(success.Result.Revision, DateTime.UtcNow.Ticks);
+                        OnRecoveryCompleted(state, success.Result.Revision, DateTime.UtcNow.Ticks);
                         break;
                     case GetFailure failure:
                         OnRecoveryFailed(failure.Cause);
@@ -356,36 +326,10 @@ namespace Akka.Persistence.State.Internal
         }
     }
 
-    //internal sealed class RecoveryState
-    //{
-    //    public RecoveryState(long revision, object state, long recoveryStartTime)
-    //    {
-    //        Revision = revision;
-    //        State = state;
-    //        RecoveryStartTime = recoveryStartTime;
-    //    }
-
-    //    public long Revision { get; }
-    //    public object State { get; }
-    //    public long RecoveryStartTime { get; }
-    //}
-
-    //internal sealed class RunningState
-    //{
-    //    public RunningState(long revision, object state)
-    //    {
-    //        Revision = revision;
-    //        State = state;
-    //    }
-
-    //    public long Revision { get; }
-    //    public object State { get; }
-
-    //    public RunningState NextSequenceNr() => Copy(Revision + 1);
-
-    //    public RunningState ApplyState(object updated) => Copy(state: updated);
-
-    //    private RunningState Copy(long? revision = null, object state = null) =>
-    //        new RunningState(revision ?? Revision, state ?? State);
-    //}
+    [Serializable]
+    public sealed class RecoveryCompleted
+    {
+        public RecoveryCompleted(object state) => State = state;
+        public object State { get; }
+    }
 }

@@ -131,7 +131,7 @@ namespace Akka.Persistence.State.Internal
         /// Highest received revision so far or `0L` if this actor
         /// hasn't replayed or stored any persistent events yet.
         /// </summary>
-        public long LastRevision { get; private set; }
+        public long LastRevision { get; private set; } // TODO: we could probably just return _currentRevision
 
         /// <summary>
         /// Recovery handler that receives persistent events during recovery. If a state snapshot has been captured and saved,
