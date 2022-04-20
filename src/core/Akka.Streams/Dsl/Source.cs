@@ -13,6 +13,7 @@ using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Akka.Actor;
+using Akka.Annotations;
 using Akka.Streams.Dsl.Internal;
 using Akka.Streams.Implementation;
 using Akka.Streams.Implementation.Fusing;
@@ -188,7 +189,8 @@ namespace Akka.Streams.Dsl
             // if it remain alone in generic params list (no need to provide types that will be infered)
             var askFlow = Flow.Create<TOut>()
                 .Watch(actorRef)
-                .SelectAsync(parallelism, async e => {
+                .SelectAsync(parallelism, async e =>
+                {
                     var reply = await actorRef.Ask(e, timeout: timeout);
                     switch (reply)
                     {
@@ -372,7 +374,7 @@ namespace Akka.Streams.Dsl
         /// <returns>A lazy <see cref="IAsyncEnumerable{T}"/> that will run each time it is enumerated.</returns>
         public IAsyncEnumerable<TOut> RunAsAsyncEnumerable(
             IMaterializer materializer) =>
-            new StreamsAsyncEnumerableRerunnable<TOut,TMat>(this, materializer);
+            new StreamsAsyncEnumerableRerunnable<TOut, TMat>(this, materializer);
 
         /// <summary>
         /// Shortcut for running this <see cref="Source{TOut,TMat}"/> as an <see cref="IAsyncEnumerable{TOut}"/>.
@@ -387,9 +389,9 @@ namespace Akka.Streams.Dsl
         public IAsyncEnumerable<TOut> RunAsAsyncEnumerableBuffer(
             IMaterializer materializer, int minBuffer = 4,
             int maxBuffer = 16) =>
-            new StreamsAsyncEnumerableRerunnable<TOut,TMat>(
-                this, materializer,minBuffer,maxBuffer);
-        
+            new StreamsAsyncEnumerableRerunnable<TOut, TMat>(
+                this, materializer, minBuffer, maxBuffer);
+
 
         /// <summary>
         /// Combines several sources with fun-in strategy like <see cref="Merge{TIn,TOut}"/> or <see cref="Concat{TIn,TOut}"/> and returns <see cref="Source{TOut,TMat}"/>.
@@ -555,7 +557,7 @@ namespace Akka.Streams.Dsl
         /// <typeparam name="T">TBD</typeparam>
         /// <param name="task">TBD</param>
         /// <returns>TBD</returns>
-        public static Source<T, NotUsed> FromTask<T>(Task<T> task) => FromGraph(new TaskSource<T>(task));        
+        public static Source<T, NotUsed> FromTask<T>(Task<T> task) => FromGraph(new TaskSource<T>(task));
 
         /// <summary>
         /// Never emits any elements, never completes and never fails.
@@ -794,6 +796,40 @@ namespace Akka.Streams.Dsl
             return new Source<T, IActorRef>(new ActorRefSource<T>(bufferSize, overflowStrategy, DefaultAttributes.ActorRefSource, Shape<T>("ActorRefSource")));
         }
 
+        [InternalApi]
+        internal static Source<T, IActorRef> ActorRefWithAck<T>(Option<IActorRef> ackTo, object ackMessage, Func<object, CompletionStrategy> onCompletion, Func<object, Exception> onFailureMessage) =>
+            FromGraph(new ActorRefBackpressureSource<T>(ackTo, ackMessage, onCompletion, onFailureMessage));
+
+        /// <summary>
+        /// Creates a `Source` that is materialized as an [[akka.actor.ActorRef]].
+        /// Messages sent to this actor will be emitted to the stream if there is demand from downstream,
+        /// and a new message will only be accepted after the previous messages has been consumed and acknowledged back.
+        /// The stream will complete with failure if a message is sent before the acknowledgement has been replied back.
+        /// 
+        /// The stream can be completed successfully by sending the actor reference a [[akka.actor.Status.Success]].
+        /// If the content is [[akka.stream.CompletionStrategy.immediately]] the completion will be signaled immidiately,
+        /// otherwise if the content is [[akka.stream.CompletionStrategy.draining]] (or anything else)
+        /// already buffered element will be signaled before siganling completion.
+        /// 
+        /// The stream can be completed with failure by sending a [[akka.actor.Status.Failure]] to the
+        /// actor reference.In case the Actor is still draining its internal buffer(after having received
+        /// a [[akka.actor.Status.Success]]) before signaling completion and it receives a[[akka.actor.Status.Failure]],
+        /// the failure will be signaled downstream immediately(instead of the completion signal).
+        ///  
+        /// The actor will be stopped when the stream is completed, failed or canceled from downstream,
+        /// i.e.you can watch it to get notified when that happens.
+        /// </summary>
+        /// <typeparam name="T">TBD</typeparam>
+        /// <param name="ackMessage">TBD</param>
+        /// <returns>TBD</returns>
+        public static Source<T, IActorRef> ActorRefWithAck<T>(object ackMessage)
+        {
+            return ActorRefWithAck<T>(Option<IActorRef>.None, ackMessage,
+                o =>
+                {
+                },
+                ex => new Status.Failure(ex));
+        }
 
         /// <summary>
         /// Combines several sources with fun-in strategy like <see cref="Merge{TIn,TOut}"/> or <see cref="Concat{TIn,TOut}"/> and returns <see cref="Source{TOut,TMat}"/>.

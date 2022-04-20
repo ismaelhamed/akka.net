@@ -350,6 +350,10 @@ namespace Akka.Streams.Implementation.Stages
         /// <summary>
         /// TBD
         /// </summary>
+        public static readonly Attributes ActorRefWithAckSource = Attributes.CreateName("actorRefWithAckSource");
+        /// <summary>
+        /// TBD
+        /// </summary>
         public static readonly Attributes QueueSource = Attributes.CreateName("queueSource");
         /// <summary>
         /// TBD
