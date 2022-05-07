@@ -298,6 +298,21 @@ namespace Akka.Streams
         public override Akka.Streams.Shape CopyFromPorts(System.Collections.Immutable.ImmutableArray<Akka.Streams.Inlet> inlets, System.Collections.Immutable.ImmutableArray<Akka.Streams.Outlet> outlets) { }
         public override Akka.Streams.Shape DeepCopy() { }
     }
+    public class static CompletionStrategy
+    {
+        [Akka.Annotations.InternalApiAttribute()]
+        public sealed class Draining : Akka.Streams.CompletionStrategy.ICompletionStrategy
+        {
+            public static readonly Akka.Streams.CompletionStrategy.Draining Instance;
+        }
+        [Akka.Annotations.DoNotInheritAttribute()]
+        public interface ICompletionStrategy { }
+        [Akka.Annotations.InternalApiAttribute()]
+        public sealed class Immediately : Akka.Streams.CompletionStrategy.ICompletionStrategy
+        {
+            public static readonly Akka.Streams.CompletionStrategy.Immediately Instance;
+        }
+    }
     public class ConnectionException : Akka.Streams.StreamTcpException
     {
         public ConnectionException(string message) { }
@@ -2759,14 +2774,11 @@ namespace Akka.Streams.Implementation
         public override Akka.Streams.Implementation.IModule WithAttributes(Akka.Streams.Attributes attributes) { }
     }
     [Akka.Annotations.InternalApiAttribute()]
-    public sealed class ActorRefSource<TOut> : Akka.Streams.Implementation.SourceModule<TOut, Akka.Actor.IActorRef>
+    public class ActorRefSource<T> : Akka.Streams.Stage.GraphStageWithMaterializedValue<Akka.Streams.SourceShape<T>, Akka.Actor.IActorRef>
     {
-        public ActorRefSource(int bufferSize, Akka.Streams.OverflowStrategy overflowStrategy, Akka.Streams.Attributes attributes, Akka.Streams.SourceShape<TOut> shape) { }
-        public override Akka.Streams.Attributes Attributes { get; }
-        protected override string Label { get; }
-        public override Reactive.Streams.IPublisher<TOut> Create(Akka.Streams.MaterializationContext context, out Akka.Actor.IActorRef materializer) { }
-        protected override Akka.Streams.Implementation.SourceModule<TOut, Akka.Actor.IActorRef> NewInstance(Akka.Streams.SourceShape<TOut> shape) { }
-        public override Akka.Streams.Implementation.IModule WithAttributes(Akka.Streams.Attributes attributes) { }
+        public ActorRefSource(int maxBuffer, Akka.Streams.OverflowStrategy overflowStrategy, System.Func<object, Akka.Streams.CompletionStrategy.ICompletionStrategy> onCompletion, System.Func<object, System.Exception> onFailure) { }
+        public override Akka.Streams.SourceShape<T> Shape { get; }
+        public override Akka.Streams.Stage.ILogicAndMaterializedValue<Akka.Actor.IActorRef> CreateLogicAndMaterializedValue(Akka.Streams.Attributes inheritedAttributes) { }
     }
     [Akka.Annotations.InternalApiAttribute()]
     public sealed class ActorSubscriberSink<TIn> : Akka.Streams.Implementation.SinkModule<TIn, Akka.Actor.IActorRef>
@@ -4738,6 +4750,8 @@ namespace Akka.Streams.Stage
         public void FailStage(System.Exception reason) { }
         protected System.Action<T> GetAsyncCallback<T>(System.Action<T> handler) { }
         protected System.Action GetAsyncCallback(System.Action handler) { }
+        [Akka.Annotations.InternalApiAttribute()]
+        protected Akka.Streams.Stage.StageActor GetEagerStageActor(Akka.Streams.IMaterializer eagerMaterializer, bool poisonPillCompatibility, Akka.Streams.Stage.StageActorRef.Receive receive) { }
         protected Akka.Streams.Stage.IInHandler GetHandler<T>(Akka.Streams.Inlet<T> inlet) { }
         protected Akka.Streams.Stage.IOutHandler GetHandler<T>(Akka.Streams.Outlet<T> outlet) { }
         [Akka.Annotations.ApiMayChangeAttribute()]
@@ -4999,6 +5013,7 @@ namespace Akka.Streams.Stage
     public sealed class StageActor
     {
         public StageActor(Akka.Streams.ActorMaterializer materializer, System.Func<Akka.Streams.Stage.StageActorRef.Receive, System.Action<System.ValueTuple<Akka.Actor.IActorRef, object>>> getAsyncCallback, Akka.Streams.Stage.StageActorRef.Receive initialReceive, string name = null) { }
+        public StageActor(Akka.Streams.ActorMaterializer materializer, System.Func<Akka.Streams.Stage.StageActorRef.Receive, System.Action<System.ValueTuple<Akka.Actor.IActorRef, object>>> getAsyncCallback, Akka.Streams.Stage.StageActorRef.Receive initialReceive, string name, bool poisonPillFallback) { }
         public Akka.Actor.IActorRef Ref { get; }
         public void Become(Akka.Streams.Stage.StageActorRef.Receive receive) { }
         public void Stop() { }

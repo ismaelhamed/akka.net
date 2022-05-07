@@ -12,6 +12,7 @@ using Akka.Streams.Dsl;
 using Akka.Streams.TestKit;
 using Akka.Streams.TestKit.Tests;
 using Akka.TestKit;
+using Akka.Util;
 using Akka.Util.Internal;
 using FluentAssertions;
 using Xunit;
@@ -124,7 +125,7 @@ namespace Akka.Streams.Tests.Dsl
             this.AssertAllStagesStopped(() =>
             {
                 var s = this.CreateManualSubscriberProbe<int>();
-                var actorRef = Source.ActorRef<int>(10, OverflowStrategy.Fail)
+                var actorRef = Source.ActorRef<int>(3, OverflowStrategy.Fail)
                     .To(Sink.FromSubscriber(s))
                     .Run(Materializer);
                 var sub = s.ExpectSubscription();
@@ -136,6 +137,77 @@ namespace Akka.Streams.Tests.Dsl
                 s.ExpectNext(1, 2, 3);
                 s.ExpectComplete();
             }, Materializer);
+        }
+
+        [Fact]
+        public void A_ActorRefSource_must_signal_buffered_elements_and_complete_the_stream_after_receiving_Status_Success_Companion()
+        {
+            this.AssertAllStagesStopped(() =>
+            {
+                var s = this.CreateManualSubscriberProbe<int>();
+                var actorRef = Source.ActorRef<int>(3, OverflowStrategy.Fail)
+                    .To(Sink.FromSubscriber(s))
+                    .Run(Materializer);
+                var sub = s.ExpectSubscription();
+                actorRef.Tell(1);
+                actorRef.Tell(2);
+                actorRef.Tell(3);
+                actorRef.Tell(Status.Success.Instance);
+                sub.Request(10);
+                s.ExpectNext(1, 2, 3);
+                s.ExpectComplete();
+            }, Materializer);
+        }
+
+        [Fact]
+        public void A_ActorRefSource_must_signal_buffered_elements_and_complete_the_stream_after_receiving_Status_Success_with_CompletionStrategy_Draining()
+        {
+             var (actorRef, s) = Source.ActorRef<int>(100, OverflowStrategy.Fail)
+                .ToMaterialized(this.SinkProbe<int>().AddAttributes(Attributes.CreateInputBuffer(1, 1)), Keep.Both)
+                .Run(Materializer);
+
+            for (var n = 1; n <= 20; n++)
+                actorRef.Tell(new Status.Success(CompletionStrategy.Draining.Instance));
+
+            s.Request(20);
+            for (var n = 1; n <= 20; n++) s.ExpectNext(n);
+            s.ExpectComplete();
+        }
+
+        [Fact]
+        public void A_ActorRefSource_must_signal_buffered_elements_and_complete_the_stream_after_receiving_Status_Success_with_CompletionStrategy_Immediately()
+        {
+            var (actorRef, s) = Source.ActorRef<int>(100, OverflowStrategy.Fail)
+               .ToMaterialized(this.SinkProbe<int>().AddAttributes(Attributes.CreateInputBuffer(1, 1)), Keep.Both)
+               .Run(Materializer);
+
+            for (var n = 1; n <= 20; n++)
+                actorRef.Tell(new Status.Success(CompletionStrategy.Immediately.Instance));
+
+            s.Request(20);
+            //Either<OnComplete, int> e = null;
+            //do
+            //{
+            //    e = s.ExpectNextOrComplete();
+            //} while (e.IsRight);
+        }
+
+        [Fact]
+        public void A_ActorRefSource_must_signal_buffered_elements_and_complete_the_stream_after_receiving_a_Poison_Pill()
+        {
+            var (actorRef, s) = Source.ActorRef<int>(100, OverflowStrategy.Fail)
+               .ToMaterialized(this.SinkProbe<int>().AddAttributes(Attributes.CreateInputBuffer(1, 1)), Keep.Both)
+               .Run(Materializer);
+
+            for (var n = 1; n <= 20; n++)
+                actorRef.Tell(PoisonPill.Instance);
+
+            s.Request(20);
+            //Either<OnComplete, int> e = null;
+            //do
+            //{
+            //    e = s.ExpectNextOrComplete();
+            //} while (e.IsRight);
         }
 
         [Fact]

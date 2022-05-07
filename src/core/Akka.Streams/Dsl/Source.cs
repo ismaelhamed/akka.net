@@ -9,10 +9,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.ExceptionServices;
 using System.Threading.Tasks;
 using Akka.Actor;
+using Akka.Annotations;
 using Akka.Streams.Dsl.Internal;
 using Akka.Streams.Implementation;
 using Akka.Streams.Implementation.Fusing;
@@ -21,6 +21,7 @@ using Akka.Streams.Util;
 using Akka.Util;
 using Akka.Util.Extensions;
 using Reactive.Streams;
+using static Akka.Streams.CompletionStrategy;
 // ReSharper disable UnusedMember.Global
 
 namespace Akka.Streams.Dsl
@@ -389,7 +390,7 @@ namespace Akka.Streams.Dsl
             int maxBuffer = 16) =>
             new StreamsAsyncEnumerableRerunnable<TOut,TMat>(
                 this, materializer,minBuffer,maxBuffer);
-        
+
 
         /// <summary>
         /// Combines several sources with fun-in strategy like <see cref="Merge{TIn,TOut}"/> or <see cref="Concat{TIn,TOut}"/> and returns <see cref="Source{TOut,TMat}"/>.
@@ -555,7 +556,7 @@ namespace Akka.Streams.Dsl
         /// <typeparam name="T">TBD</typeparam>
         /// <param name="task">TBD</param>
         /// <returns>TBD</returns>
-        public static Source<T, NotUsed> FromTask<T>(Task<T> task) => FromGraph(new TaskSource<T>(task));        
+        public static Source<T, NotUsed> FromTask<T>(Task<T> task) => FromGraph(new TaskSource<T>(task));
 
         /// <summary>
         /// Never emits any elements, never completes and never fails.
@@ -749,6 +750,68 @@ namespace Akka.Streams.Dsl
         }
 
         /// <summary>
+        /// INTERNAL API
+        /// 
+        /// <para>Creates a <see cref="Source{TOut,TMat}"/> that is materialized as an <see cref="IActorRef"/>.
+        /// Messages sent to this actor will be emitted to the stream if there is demand from downstream,
+        /// otherwise they will be buffered until request for demand is received.
+        /// </para>
+        /// <para>
+        /// Depending on the defined <see cref="OverflowStrategy"/> it might drop elements if
+        /// there is no space available in the buffer.
+        /// </para>
+        /// <para>
+        /// The strategy <see cref="OverflowStrategy.Backpressure"/> is not supported, and an
+        /// NotSupportedException("Backpressure overflowStrategy not supported") will be thrown if it is passed as argument.
+        /// </para>
+        /// <para>
+        /// The buffer can be disabled by using <paramref name="bufferSize"/> of 0 and then received messages are dropped
+        /// if there is no demand from downstream. When <paramref name="bufferSize"/> is 0 the <paramref name="overflowStrategy"/> does
+        /// not matter. An async boundary is added after this Source; as such, it is never safe to assume the downstream will always generate demand.
+        /// </para>
+        /// <para>
+        /// The stream can be completed successfully by sending the actor reference a message that is matched by <paramref name="_onCompletion"/> 
+        /// in which case already buffered elements will be signaled before signaling completion.
+        /// </para>
+        /// <para>
+        /// The stream can be completed with failure by sending a message that is matched by <paramref name="_onFailure"/>. The extracted 
+        /// <see cref="Exception"/> will be used to fail the stream. In case the Actor is still draining its internal buffer (after having 
+        /// received a message matched by `_onCompletion`) before signaling completion and it receives a message matched by `_onFailure`, 
+        /// the failure will be signaled downstream immediately (instead of the completion signal).
+        /// </para>
+        /// <para>
+        /// Note that terminating the actor without first completing it, either with a success or a failure, will prevent the actor 
+        /// triggering downstream completion and the stream will continue to run even though the source actor is dead. Therefore you 
+        /// should **not** attempt to manually terminate the actor such as with a <see cref="PoisonPill"/>.
+        /// </para>
+        /// <para>
+        /// The actor will be stopped when the stream is completed, failed or canceled from downstream,
+        /// i.e. you can watch it to get notified when that happens.
+        /// </para>
+        /// See also <seealso cref="Queue{T}"/>
+        /// </summary>
+        /// <typeparam name="T">TBD</typeparam>
+        /// <param name="_onCompletion">TBD</param>
+        /// <param name="_onFailure">TBD</param>
+        /// <param name="bufferSize">The size of the buffer in element count</param>
+        /// <param name="overflowStrategy">Strategy that is used when incoming elements cannot fit inside the buffer</param>
+        /// <exception cref="ArgumentException">
+        /// This exception is thrown when the specified <paramref name="bufferSize"/> is less than zero.
+        /// </exception>
+        /// <exception cref="NotSupportedException">
+        /// This exception is thrown when the specified <paramref name="overflowStrategy"/> is of type <see cref="OverflowStrategy.Backpressure"/>.
+        /// </exception>
+        [InternalApi]
+        internal static Source<T, IActorRef> ActorRef<T>(Func<object, ICompletionStrategy> _onCompletion, Func<object, Exception> _onFailure, int bufferSize, OverflowStrategy overflowStrategy)
+        {
+            if (bufferSize < 0) throw new ArgumentException("Buffer size must be greater than or equal 0", nameof(bufferSize));
+            if (overflowStrategy == OverflowStrategy.Backpressure) throw new NotSupportedException("Backpressure overflow strategy is not supported");
+
+            return FromGraph(new ActorRefSource<T>(bufferSize, overflowStrategy, _onCompletion, _onFailure))
+                .WithAttributes(DefaultAttributes.ActorRefSource);
+        }
+
+        /// <summary>
         /// Creates a <see cref="Source{TOut,TMat}"/> that is materialized as an <see cref="IActorRef"/>.
         /// Messages sent to this actor will be emitted to the stream if there is demand from downstream,
         /// otherwise they will be buffered until request for demand is received.
@@ -758,7 +821,7 @@ namespace Akka.Streams.Dsl
         /// </para>
         /// <para>
         /// The strategy <see cref="OverflowStrategy.Backpressure"/> is not supported, and an
-        /// IllegalArgument("Backpressure overflowStrategy not supported") will be thrown if it is passed as argument.
+        /// NotSupportedException("Backpressure overflowStrategy not supported") will be thrown if it is passed as argument.
         /// </para>
         /// <para>
         /// The buffer can be disabled by using <paramref name="bufferSize"/> of 0 and then received messages are dropped
@@ -766,21 +829,17 @@ namespace Akka.Streams.Dsl
         /// not matter. An async boundary is added after this Source; as such, it is never safe to assume the downstream will always generate demand.
         /// </para>
         /// <para>
-        /// The stream can be completed successfully by sending the actor reference a <see cref="Status.Success"/>
-        /// message (whose content will be ignored) in which case already buffered elements will be signaled before signaling completion,
-        /// or by sending <see cref="PoisonPill"/> in which case completion will be signaled immediately.
+        /// The stream can be completed successfully by sending the actor reference a <see cref="Status.Success"/>. If the content is 
+        /// <see cref="CompletionStrategy.Immediately"/> the completion will be signaled immidiately, otherwise if the content is 
+        /// <see cref="CompletionStrategy.Draining" /> (or anything else) already buffered elements will be signaled before siganling 
+        /// completion. Sending <see cref="PoisonPill"/> will signal completion immediately but this behavior is deprecated and 
+        /// scheduled to be removed.
         /// </para>
         /// <para>
         /// The stream can be completed with failure by sending a <see cref="Status.Failure"/> to the
         /// actor reference. In case the Actor is still draining its internal buffer (after having received
         /// a <see cref="Status.Success"/>) before signaling completion and it receives a <see cref="Status.Failure"/>,
         /// the failure will be signaled downstream immediately (instead of the completion signal).
-        /// </para>
-        /// <para>
-        /// Note that terminating the actor without first completing it, either with a success or a
-        /// failure, will prevent the actor triggering downstream completion and the stream will continue
-        /// to run even though the source actor is dead. Therefore you should **not** attempt to
-        /// manually terminate the actor such as with a <see cref="PoisonPill"/>.
         /// </para>
         /// <para>
         /// The actor will be stopped when the stream is completed, failed or canceled from downstream,
@@ -800,12 +859,28 @@ namespace Akka.Streams.Dsl
         /// <returns>TBD</returns>
         public static Source<T, IActorRef> ActorRef<T>(int bufferSize, OverflowStrategy overflowStrategy)
         {
-            if (bufferSize < 0) throw new ArgumentException("Buffer size must be greater than or equal 0", nameof(bufferSize));
-            if (overflowStrategy == OverflowStrategy.Backpressure) throw new NotSupportedException("Backpressure overflow strategy is not supported");
+            ICompletionStrategy _onCompletion(object message)
+            {
+                switch (message)
+                {
+                    case Status.Success success when success.Status is ICompletionStrategy s:
+                        return s;
+                    case Status.Success success:
+                        return Draining.Instance;
+                    default:
+                        throw new ArgumentException($"Expected `Status.Success` but got [{message.GetType().Name}]");
+                }
+            }
 
-            return new Source<T, IActorRef>(new ActorRefSource<T>(bufferSize, overflowStrategy, DefaultAttributes.ActorRefSource, Shape<T>("ActorRefSource")));
+            Exception _onFailure(object message)
+            {
+                return message is Status.Failure failure
+                    ? failure.Cause
+                    : throw new ArgumentException($"Expected `Status.Failure` but got [{message.GetType().Name}]");
+            }
+
+            return ActorRef<T>(_onCompletion, _onFailure, bufferSize, overflowStrategy);
         }
-
 
         /// <summary>
         /// Combines several sources with fun-in strategy like <see cref="Merge{TIn,TOut}"/> or <see cref="Concat{TIn,TOut}"/> and returns <see cref="Source{TOut,TMat}"/>.

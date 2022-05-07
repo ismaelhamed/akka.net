@@ -148,6 +148,14 @@ namespace Akka.Streams.Stage
         public IGraph<TShape, TMaterialized> WithAttributes(Attributes attributes) => new Graph(Shape, Module, attributes);
 
         /// <summary>
+        /// Grants access to the materializer before preStart of the graph stage logic is invoked.        /// 
+        /// <para>INTERNAL API</para>
+        /// </summary>
+        [InternalApi]
+        internal virtual ILogicAndMaterializedValue<TMaterialized> CreateLogicAndMaterializedValue(Attributes inheritedAttributes, IMaterializer materializer) =>
+            CreateLogicAndMaterializedValue(inheritedAttributes);
+
+        /// <summary>
         /// TBD
         /// </summary>
         /// <param name="inheritedAttributes">TBD</param>
@@ -181,9 +189,12 @@ namespace Akka.Streams.Stage
     }
 
     /// <summary>
-    /// A GraphStage represents a reusable graph stream processing stage. A GraphStage consists of a <see cref="Shape"/> which describes
+    /// A GraphStage represents a reusable graph stream processing stage. 
+    /// <para>
+    /// A GraphStage consists of a <see cref="Shape"/> which describes
     /// its input and output ports and a factory function that creates a <see cref="GraphStageLogic"/> which implements the processing
     /// logic that ties the ports together.
+    /// </para>
     /// </summary>
     /// <typeparam name="TShape">TBD</typeparam>
     public abstract class GraphStage<TShape> : GraphStageWithMaterializedValue<TShape, NotUsed> where TShape : Shape
@@ -1620,16 +1631,24 @@ namespace Akka.Streams.Stage
         /// <param name="receive">Callback that will be called upon receiving of a message by this special Actor</param>
         /// <returns>Minimal actor with watch method</returns>
         [ApiMayChange]
-        protected StageActor GetStageActor(StageActorRef.Receive receive)
+        protected StageActor GetStageActor(StageActorRef.Receive receive) => 
+            GetEagerStageActor(_interpreter.Materializer, false, receive);
+
+        [InternalApi]
+        protected StageActor GetEagerStageActor(
+            IMaterializer eagerMaterializer,
+            bool poisonPillCompatibility, // fallback required for source actor backwards compatibility
+            StageActorRef.Receive receive)
         {
             if (_stageActor == null)
             {
-                var actorMaterializer = ActorMaterializerHelper.Downcast(Interpreter.Materializer);
+                var actorMaterializer = ActorMaterializerHelper.Downcast(eagerMaterializer);
                 _stageActor = new StageActor(
                     actorMaterializer,
                     r => GetAsyncCallback<(IActorRef, object)>(message => r(message)),
                     receive,
-                    StageActorName);
+                    StageActorName, 
+                    poisonPillCompatibility);
             }
             else
                 _stageActor.Become(receive);
@@ -2378,10 +2397,18 @@ namespace Akka.Streams.Stage
         private StageActorRef.Receive _behavior;
 
         public StageActor(
+            ActorMaterializer materializer, 
+            Func<StageActorRef.Receive, Action<(IActorRef, object)>> getAsyncCallback, 
+            StageActorRef.Receive initialReceive, 
+            string name = null) : this(materializer, getAsyncCallback, initialReceive, name, false) 
+        { }
+
+        public StageActor(
             ActorMaterializer materializer,
             Func<StageActorRef.Receive, Action<(IActorRef, object)>> getAsyncCallback,
             StageActorRef.Receive initialReceive,
-            string name = null)
+            string name,
+            bool poisonPillFallback) // internal fallback to support deprecated SourceActorRef implementation replacement
         {
             _callback = getAsyncCallback(InternalReceive);
             _behavior = initialReceive;
@@ -2397,6 +2424,9 @@ namespace Akka.Streams.Stage
             {
                 switch (message)
                 {
+                    case PoisonPill poisonPill when poisonPillFallback:
+                        _callback((sender, poisonPill)); 
+                        break;
                     case PoisonPill _:
                     case Kill _:
                         materializer.Logger.Warning("{0} message sent to StageActor({1}) will be ignored, since it is not a real Actor. " +
@@ -2404,7 +2434,7 @@ namespace Akka.Streams.Stage
                         break;
                     default: _callback((sender, message)); break;
                 }
-            });
+            }, name);
         }
 
         /// <summary>
