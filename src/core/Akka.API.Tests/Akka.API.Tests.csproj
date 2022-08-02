@@ -29,7 +29,7 @@
       <PackageReference Include="DiffPlex" Version="1.7.0" />
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(TestSdkVersion)" />
     <PackageReference Include="xunit" Version="$(XunitVersion)" />
-    <PackageReference Include="xunit.assert" Version="2.4.1" />
+    <PackageReference Include="xunit.assert" Version="2.4.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="$(XunitVersion)" />
     <PackageReference Include="ApiApprover" Version="9.3.0" />
   </ItemGroup>
