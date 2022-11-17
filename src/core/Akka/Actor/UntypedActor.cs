@@ -12,8 +12,16 @@ using Akka.Dispatch;
 namespace Akka.Actor
 {
     /// <summary>
-    /// Class UntypedActor.
+    /// Actor base class that should be inherited to create an Actor with the semantics of the 'Actor Model':
+    /// <a href="http://en.wikipedia.org/wiki/Actor_model">http://en.wikipedia.org/wiki/Actor_model</a>
+    /// <para>
+    /// The Actor's own <see cref="IActorRef"/> is available as `Self`, the current
+    /// message's sender as `Sender` and <see cref="IUntypedActorContext"/> as
+    /// `Context`. The only abstract method is `OnReceive()` which is invoked for
+    /// each processed message unless dynamically overridden using `Context.Become()`.
+    /// </para>
     /// </summary>
+    [Obsolete("Use AbstractActor instead of UntypedActor.")]
     public abstract class UntypedActor : ActorBase
     {
         /// <summary>
@@ -31,19 +39,13 @@ namespace Akka.Actor
         /// TBD
         /// </summary>
         /// <param name="action">TBD</param>
-        protected void RunTask(Action action)
-        {
-            ActorTaskScheduler.RunTask(action);
-        }
+        protected void RunTask(Action action) => ActorTaskScheduler.RunTask(action);
 
         /// <summary>
         /// TBD
         /// </summary>
         /// <param name="action">TBD</param>
-        protected void RunTask(Func<Task> action)
-        {
-            ActorTaskScheduler.RunTask(action);
-        }
+        protected void RunTask(Func<Task> action) => ActorTaskScheduler.RunTask(action);
 
         /// <summary>
         /// To be implemented by concrete UntypedActor, this defines the behavior of the UntypedActor.
@@ -56,10 +58,7 @@ namespace Akka.Actor
         /// Changes the actor's behavior and replaces the current receive handler with the specified handler.
         /// </summary>
         /// <param name="receive">The new message handler.</param>
-        protected void Become(UntypedReceive receive)
-        {
-            Context.Become(receive);
-        }
+        protected void Become(UntypedReceive receive) => Context.Become(receive);
 
         /// <summary>
         /// Changes the actor's behavior and replaces the current receive handler with the specified handler.
@@ -68,14 +67,13 @@ namespace Akka.Actor
         /// is matched with a call to <see cref="IActorContext.UnbecomeStacked"/>.</remarks>
         /// </summary>
         /// <param name="receive">The new message handler.</param>
-        protected void BecomeStacked(UntypedReceive receive)
-        {
-            Context.BecomeStacked(receive);
-        }
+        protected void BecomeStacked(UntypedReceive receive) => Context.BecomeStacked(receive);
 
         /// <summary>
-        /// TBD
+        /// Returns this UntypedActor's IUntypedActorContext 
+        /// The IUntypedActorContext is not thread safe so do not expose it outside of the
+        /// <see cref="UntypedActor"/>.
         /// </summary>
-        protected new static IUntypedActorContext Context => (IUntypedActorContext) ActorBase.Context;
+        protected new static IUntypedActorContext Context => (IUntypedActorContext)ActorBase.Context;
     }
 }
