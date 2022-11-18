@@ -44,7 +44,6 @@ namespace Akka.Tools.MatchHandler
         private readonly IMatchCompiler<TItem> _compiler;
         private State _state;
 
-
         /// <summary>
         /// Initializes a new instance of the <see cref="MatchBuilder{TItem}"/> class.
         /// </summary>

@@ -8,11 +8,11 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Actor.Internal;
 using Akka.Configuration;
 using Akka.Tools.MatchHandler;
-using System.Threading.Tasks;
 
 namespace Akka.Persistence
 {
@@ -26,7 +26,7 @@ namespace Akka.Persistence
         /// The singleton instance of <see cref="RecoveryCompleted"/>.
         /// </summary>
         public static readonly RecoveryCompleted Instance = new RecoveryCompleted();
-        private RecoveryCompleted(){}
+        private RecoveryCompleted() { }
 
         public override bool Equals(object obj) => obj is RecoveryCompleted;
         public override int GetHashCode() => nameof(RecoveryCompleted).GetHashCode();
@@ -255,22 +255,17 @@ namespace Akka.Persistence
     public abstract class PersistentActor : Eventsourced
     {
         /// <inheritdoc/>
-        protected override bool Receive(object message)
-        {
-            return ReceiveCommand(message);
-        }
+        protected override bool Receive(object message) => ReceiveCommand(message);
     }
 
     /// <summary>
     /// Persistent actor - can be used to implement command or eventsourcing.
     /// </summary>
+    [Obsolete("Use AbstractPersistentActor instead of UntypedPersistentActor.")]
     public abstract class UntypedPersistentActor : Eventsourced
     {
         /// <inheritdoc/>
-        protected override bool Receive(object message)
-        {
-            return ReceiveCommand(message);
-        }
+        protected override bool Receive(object message) => ReceiveCommand(message);
 
         /// <inheritdoc/>
         protected sealed override bool ReceiveCommand(object message)
@@ -302,10 +297,7 @@ namespace Akka.Persistence
         /// Changes the actor's behavior and replaces the current receive handler with the specified handler.
         /// </summary>
         /// <param name="receive">The new message handler.</param>
-        protected void Become(UntypedReceive receive)
-        {
-            Context.Become(receive);
-        }
+        protected void Become(UntypedReceive receive) => Context.Become(receive);
 
         /// <summary>
         /// Changes the actor's behavior and replaces the current receive handler with the specified handler.
@@ -314,10 +306,7 @@ namespace Akka.Persistence
         /// is matched with a call to <see cref="IActorContext.UnbecomeStacked"/>.</remarks>
         /// </summary>
         /// <param name="receive">The new message handler.</param>
-        protected void BecomeStacked(UntypedReceive receive)
-        {
-            Context.BecomeStacked(receive);
-        }
+        protected void BecomeStacked(UntypedReceive receive) => Context.BecomeStacked(receive);
 
         /// <summary>
         /// TBD
@@ -511,7 +500,7 @@ namespace Akka.Persistence
         #endregion
 
         #region Command helper methods
-        
+
         private void EnsureMayConfigureCommandHandlers()
         {
             if (_matchCommandBuilders.Count <= 0)
@@ -697,5 +686,57 @@ namespace Akka.Persistence
         }
 
         #endregion
+    }
+
+    /// <summary>
+    /// A persistent actor - can be used to implement command or event sourcing.
+    /// </summary>
+    public abstract class AbstractPersistentActor : Eventsourced
+    {
+        protected override bool Receive(object message) => CreateReceive(message);
+
+        /// <summary>
+        /// Recovery handler that receives persisted events during recovery. If a state snapshot
+        /// has been captured and saved, this handler will receive a <see cref="SnapshotOffer"/> message
+        /// followed by events that are younger than the offered snapshot.
+        /// <para>
+        /// This handler must not have side-effects other than changing persistent actor state i.e. it
+        /// should not perform actions that may fail, such as interacting with external services,
+        /// for example.
+        /// </para>
+        /// <para>
+        /// If there is a problem with recovering the state of the actor from the journal, the error
+        /// will be logged and the actor will be stopped.
+        /// </para>
+        /// </summary>
+        protected abstract Receive CreateReceiveRecover { get; }
+
+        protected override bool ReceiveRecover(object message) => CreateReceiveRecover(message);
+
+        /// <summary>
+        /// An persistent actor has to define its initial receive behavior by implementing
+        /// the `createReceive` method, also known as the command handler. Typically
+        /// validates commands against current state(and/or by communication with other actors).
+        /// On successful validation, one or more events are derived from a command and
+        /// these events are then persisted by calling `persist`.
+        /// </summary>
+        protected abstract Receive CreateReceive { get; }
+
+        protected override bool ReceiveCommand(object message) => CreateReceive(message);
+
+        /// <summary>
+        /// Convenience factory of the `ReceiveBuilder`.
+        /// Creates a new empty <see cref="Tools.MatchHandler.ReceiveBuilder"/>.
+        /// </summary>
+        public static ReceiveBuilder ReceiveBuilder => ReceiveBuilder.Create();
+    }
+
+    /// <summary>
+    /// Combination of <see cref="AbstractPersistentActor"/> and <see cref="IWithTimers"/>.
+    /// </summary>
+    public abstract class AbstractPersistentActorWithTimers : AbstractPersistentActor, IWithTimers
+    {
+        /// <inheritdoc />
+        public ITimerScheduler Timers { get; set; }
     }
 }

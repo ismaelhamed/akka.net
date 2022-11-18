@@ -6,7 +6,6 @@
 //-----------------------------------------------------------------------
 
 using System;
-using System.Threading.Tasks;
 using Akka.Dispatch;
 using Akka.Tools.MatchHandler;
 
@@ -28,17 +27,30 @@ namespace Akka.Actor
         /// </summary>
         public static ReceiveBuilder ReceiveBuilder => ReceiveBuilder.Create();
 
-        /// <summary>
-        /// TBD
-        /// </summary>
-        /// <param name="action">TBD</param>
-        protected void RunTask(Action action) => ActorTaskScheduler.RunTask(action);
+        ///// <summary>
+        ///// TBD
+        ///// </summary>
+        ///// <param name="action">TBD</param>
+        //protected void RunTask(Action action) => ActorTaskScheduler.RunTask(action);
 
-        /// <summary>
-        /// TBD
-        /// </summary>
-        /// <param name="action">TBD</param>
-        protected void RunTask(Func<Task> action) => ActorTaskScheduler.RunTask(action);
+        ///// <summary>
+        ///// TBD
+        ///// </summary>
+        ///// <param name="action">TBD</param>
+        //protected void RunTask(Func<Task> action) => ActorTaskScheduler.RunTask(action);
+    }
+
+    /// <summary>
+    /// Support for scheduled `Self` messages via <see cref="Scheduler.TimerScheduler"/>.
+    /// <para>
+    /// Timers are bound to the lifecycle of the actor that owns it,
+    /// and thus are cancelled automatically when it is restarted or stopped.
+    /// </para>
+    /// </summary>
+    public abstract class AbstractActorWithTimers : AbstractActor, IWithTimers
+    {
+        /// <inheritdoc />
+        public ITimerScheduler Timers { get; set; }
     }
 
     /// <summary>

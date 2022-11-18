@@ -6,12 +6,14 @@
 //-----------------------------------------------------------------------
 
 using System;
+using System.Threading.Tasks;
 using Akka.Actor;
+using Akka.Dispatch;
 
 namespace Akka.Tools.MatchHandler
 {
     /// <summary>
-    /// Used for building a partial function for <see cref="Actor.ActorBase.Receive(object)"/>.
+    /// Used for building a partial function for <see cref="ActorBase.Receive(object)"/>.
     /// <para>There is both a match on type only, and a match on type and predicate.</para>
     /// <para>Inside an actor you can use it like this to define your receive method:
     /// <code>
@@ -57,38 +59,6 @@ namespace Akka.Tools.MatchHandler
         {
             _matchHandlerBuilder.MatchAny(apply);
             return this;
-        }
-    }
-
-    public static class DelegateExtensions
-    {
-        /// <summary>
-        /// https://github.com/dotnet/csharplang/issues/149#issuecomment-296172573
-        /// </summary>
-        public static T Cast<T>(this Delegate @delegate) where T : class
-        {
-            if (@delegate == null) return null;
-
-            var multicastList = (@delegate as MulticastDelegate)?.GetInvocationList();
-            if (multicastList != null)
-            {
-                switch (multicastList.Length)
-                {
-                    case 0:
-                        return null;
-                    case 1:
-                        if (multicastList[0] != @delegate)
-                            return multicastList[0].Cast<T>();
-                        break;
-                    default:
-                        var convertedItems = new Delegate[multicastList.Length];
-                        for (var i = 0; i < multicastList.Length; i++)
-                            convertedItems[i] = (Delegate)(object)multicastList[i].Cast<T>();
-                        return (T)(object)Delegate.Combine(convertedItems);
-                }
-            }
-
-            return (T)(object)Delegate.CreateDelegate(typeof(T), @delegate.Target, @delegate.Method, true);
         }
     }
 }

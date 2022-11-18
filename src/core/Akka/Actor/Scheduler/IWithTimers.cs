@@ -13,8 +13,11 @@ namespace Akka.Actor
     public interface IWithTimers
     {
         /// <summary>
-        /// Gets or sets the TimerScheduler. This will be automatically populated by the framework in base constructor.
+        /// Start and cancel timers via the enclosed  <see cref="TimerScheduler"/>. 
+        /// <para>
+        /// This will be automatically populated by the framework in base constructor.
         /// Implement this as an auto property.
+        /// </para>
         /// </summary>
         ITimerScheduler Timers { get; set; }
     }
