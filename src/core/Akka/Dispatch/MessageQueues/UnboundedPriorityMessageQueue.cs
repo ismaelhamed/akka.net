@@ -93,5 +93,10 @@ namespace Akka.Dispatch.MessageQueues
         {
             _prependBuffer.Push(envelope);
         }
+
+        public void EnqueueFirst(IActorRef receiver, Envelope envelope)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

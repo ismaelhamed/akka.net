@@ -63,6 +63,8 @@ namespace Akka.Dispatch
         /// </summary>
         /// <param name="envelope">TBD</param>
         void EnqueueFirst(Envelope envelope);
+
+        void EnqueueFirst(IActorRef receiver, Envelope envelope);
     }
 
     /// <summary>
