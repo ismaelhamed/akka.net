@@ -1,9 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 
 namespace Akka.Util.Collections
 {
-    public abstract class AbstractQueue<E> : AbstractCollection<E>, IQueue<E> where E : class
+    public abstract class AbstractQueue<E> : AbstractCollection<E>, IQueue<E>
     {
         public abstract bool Offer(E element);
 

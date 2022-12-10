@@ -15,16 +15,18 @@
  * limitations under the License.
  */
 
-using System.Collections.Generic;
+using System;
 
-namespace Akka.Util.Collections
+namespace Akka.Util.Collections.Concurrent.Locks
 {
-    public interface IQueue<T> : ICollection<T>
+    public interface ICondition
     {
-        bool Offer(T entry);
-        T Poll();
-        T Remove();
-        T Peek();
-        T Element();
+        void Await();
+        void AwaitUnInterruptibly();
+        int Await(int timeout);
+        int Await(TimeSpan timeout);
+        bool AwaitUntil(DateTime deadline);
+        void Signal();
+        void SignalAll();
     }
 }

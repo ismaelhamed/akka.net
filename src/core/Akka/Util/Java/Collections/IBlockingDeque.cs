@@ -16,33 +16,9 @@
  */
 
 using System;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
 
 namespace Akka.Util.Collections
 {
-    public interface IDeque<T> : IQueue<T>
-    {
-        void AddFirst(T entry);
-        void AddLast(T entry);
-        bool OfferFirst(T entry);
-        bool OfferLast(T entry);
-        T PollFirst();
-        T PollLast();
-        T TakeFirst();
-        T TakeLast();
-        T RemoveFirst();
-        T RemoveLast();
-        T GetFirst();
-        T GetLast();
-        T PeekFirst();
-        T PeekLast();
-        bool RemoveFirstOccurrence(T entry);
-        bool RemoveLastOccurrence(T entry);
-        void Push(T entry);
-        T Pop();
-    }
-
     public interface IBlockingDeque<E> : IBlockingQueue<E>, IDeque<E>
     {
         void PutFirst(E e);
@@ -55,18 +31,5 @@ namespace Akka.Util.Collections
         E PollLast(int timeout);
         E PollFirst(TimeSpan timeout);
         E PollLast(TimeSpan timeout);
-    }
-
-    public interface IBlockingQueue<E> : IQueue<E>
-    {
-        void Put(E e);
-        bool Offer(E e, int timeout);
-        bool Offer(E e, TimeSpan timeout);
-        E Take();
-        E Poll(int timeout);
-        E Poll(TimeSpan timeout);
-        int RemainingCapacity();
-        int DrainTo(Collection<E> c);
-        int DrainTo(Collection<E> c, int maxElements);
     }
 }

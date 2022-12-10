@@ -1,11 +1,13 @@
 ﻿using System;
 using Akka.Actor;
 using Akka.Configuration;
+using Akka.Dispatch.MessageQueues;
 using Akka.Event;
 using Akka.Util.Collections;
+using Akka.Util.Collections.Concurrent;
 using Akka.Util.Internal;
 
-namespace Akka.Dispatch.MessageQueues
+namespace Akka.Dispatch
 {
     /// <summary>
     /// A QueueBasedMessageQueue is a IMessageQueue backed by a Akka.Util.Collections.IQueue.
@@ -18,9 +20,9 @@ namespace Akka.Dispatch.MessageQueues
 
         public abstract bool TryDequeue(out Envelope envelope);
 
-        public bool HasMessages => Queue.Count > 0;
+        public bool HasMessages => !Queue.IsEmpty();
 
-        public int Count => Queue.Count;
+        public int Count => Queue.Size();
 
         public virtual void CleanUp(IActorRef owner, IMessageQueue deadletters)
         {
@@ -48,9 +50,11 @@ namespace Akka.Dispatch.MessageQueues
     {
         protected IBlockingDeque<Envelope> _queue;
 
-        public TimeSpan PushTimeOut { get; }
+        public TimeSpan PushTimeOut { get; protected set; }
 
-        protected sealed override IQueue<Envelope> Queue { get; } = _queue;
+        public BoundedDequeBasedMessageQueue() => Queue = _queue;
+
+        protected sealed override IQueue<Envelope> Queue { get; }
 
         //// Covariant types in netstandard2.0
         //protected override IBlockingDeque<Envelope> Queue { get; }
@@ -97,12 +101,12 @@ namespace Akka.Dispatch.MessageQueues
         TimeSpan PushTimeOut { get; }
     }
 
-    public class BoundedDequeBasedMailbox : MailboxType, IProducesMessageQueue<BoundedDequeBasedMessageQueue>, IProducesPushTimeoutSemanticsMailbox
+    public class BoundedDequeBasedMailbox2 : MailboxType, IProducesMessageQueue<BoundedDequeBasedMailbox2.MessageQueue>, IProducesPushTimeoutSemanticsMailbox
     {
         public int Capacity { get; }
         public TimeSpan PushTimeOut { get; }
 
-        public BoundedDequeBasedMailbox(int capacity, TimeSpan pushTimeOut)
+        public BoundedDequeBasedMailbox2(int capacity, TimeSpan pushTimeOut)
             : base(null, null)
         {
             if (capacity < 0)
@@ -112,20 +116,19 @@ namespace Akka.Dispatch.MessageQueues
             PushTimeOut = pushTimeOut;
         }
 
-        public BoundedDequeBasedMailbox(Settings settings, Config config)
+        public BoundedDequeBasedMailbox2(Settings settings, Config config)
             : this(config.GetInt("mailbox-capacity"), config.GetTimeSpan("mailbox-push-timeout-time"))
         { }
 
-        public override IMessageQueue Create(IActorRef owner, ActorSystem system)
-        {
-            throw new NotImplementedException();
-        }
+        public override IMessageQueue Create(IActorRef owner, ActorSystem system) =>
+            new MessageQueue(Capacity, PushTimeOut);
 
-        public class MessageQueue : BoundedDequeBasedMessageQueue
+        private class MessageQueue : BoundedDequeBasedMessageQueue
         {
-            public MessageQueue()
+            public MessageQueue(int capacity, TimeSpan pushTimeOut)
             {
-                _queue = new LinkedBlockingDeque<Envelope>();
+                _queue = new LinkedBlockingDeque<Envelope>(capacity);
+                PushTimeOut = pushTimeOut;
             }
         }
     }

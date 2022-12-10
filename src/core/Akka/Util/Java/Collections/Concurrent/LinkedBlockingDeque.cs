@@ -1,10 +1,9 @@
 ﻿using System;
-using System.Collections.ObjectModel;
-using Akka.Util.Internal.Collections;
+using Akka.Util.Collections.Concurrent.Locks;
 
-namespace Akka.Util.Collections
+namespace Akka.Util.Collections.Concurrent
 {
-    public class LinkedBlockingDeque<E> : AbstractQueue<E>, IBlockingDeque<E> where E : class
+    public class LinkedBlockingDeque<E> : AbstractQueue<E>, IBlockingDeque<E>
     {
         #region Private implementation region
 
@@ -61,10 +60,10 @@ namespace Akka.Util.Collections
         private readonly ReentrantLock mutex = new ReentrantLock();
 
         /// Condition for waiting takes
-        private readonly Condition notEmpty;
+        private readonly ICondition notEmpty;
 
         /// Condition for waiting puts
-        private readonly Condition notFull;
+        private readonly ICondition notFull;
 
         /// <summary>
         /// Links e as the first element, or returns false is the Deque is full.
@@ -122,11 +121,11 @@ namespace Akka.Util.Collections
         {
             Node<E> f = first;
 
-            if (f == null) return null;
+            if (f == null) return default;
 
             Node<E> n = f.next;
             E item = f.item;
-            f.item = null;
+            f.item = default;
             f.next = f; // help GC
             first = n;
 
@@ -151,11 +150,11 @@ namespace Akka.Util.Collections
         {
             Node<E> l = last;
 
-            if (l == null) return null;
+            if (l == null) return default;
 
             Node<E> p = l.prev;
             E item = l.item;
-            l.item = null;
+            l.item = default;
             l.prev = l; // help GC
             last = p;
 
@@ -193,7 +192,7 @@ namespace Akka.Util.Collections
             {
                 p.next = n;
                 n.prev = p;
-                x.item = null;
+                x.item = default;
                 // Don't mess with x's links.  They may still be in use by an iterator.
                 --count;
                 notFull.Signal();
@@ -202,12 +201,11 @@ namespace Akka.Util.Collections
 
         #endregion
 
-        public LinkedBlockingDeque()
-            : this(int.MaxValue)
-        { }
+        public LinkedBlockingDeque() : this(int.MaxValue)
+        {
+        }
 
-        public LinkedBlockingDeque(int capacity)
-            : base()
+        public LinkedBlockingDeque(int capacity) : base()
         {
             this.notEmpty = mutex.NewCondition();
             this.notFull = mutex.NewCondition();
@@ -219,13 +217,12 @@ namespace Akka.Util.Collections
             this.capacity = capacity;
         }
 
-        public LinkedBlockingDeque(Collection<E> c)
-            : this(int.MaxValue)
+        public LinkedBlockingDeque(ICollection<E> c) : this(int.MaxValue)
         {
             mutex.Lock();
             try
             {
-                Iterator<E> iterator = c.Iterator();
+                IIterator<E> iterator = c.Iterator();
                 while (iterator.HasNext)
                 {
                     E e = iterator.Next();
@@ -243,12 +240,12 @@ namespace Akka.Util.Collections
             }
         }
 
-        public LinkedBlockingDeque(System.Collections.Generic.ICollection<E> c) : this(Int32.MaxValue)
+        public LinkedBlockingDeque(System.Collections.Generic.ICollection<E> c) : this(int.MaxValue)
         {
             mutex.Lock();
             try
             {
-                foreach (var e in c)
+                foreach (E e in c)
                 {
                     if (e == null) throw new NullReferenceException();
                     if (!LinkLast(e))
@@ -354,7 +351,7 @@ namespace Akka.Util.Collections
         {
             if (e == null) throw new NullReferenceException();
 
-            var deadline = DateTime.Now;
+            DateTime deadline = DateTime.Now;
 
             if (timeout > TimeSpan.Zero)
             {
@@ -373,7 +370,7 @@ namespace Akka.Util.Collections
 
                     notFull.Await(timeout);
 
-                    var awakeTime = DateTime.Now;
+                    DateTime awakeTime = DateTime.Now;
                     if (awakeTime > deadline)
                     {
                         timeout = TimeSpan.Zero;
@@ -401,7 +398,7 @@ namespace Akka.Util.Collections
         {
             if (e == null) throw new NullReferenceException();
 
-            var deadline = DateTime.Now;
+            DateTime deadline = DateTime.Now;
 
             if (timeout > TimeSpan.Zero)
             {
@@ -420,7 +417,7 @@ namespace Akka.Util.Collections
 
                     notFull.Await(timeout);
 
-                    var awakeTime = DateTime.Now;
+                    DateTime awakeTime = DateTime.Now;
                     if (awakeTime > deadline)
                     {
                         timeout = TimeSpan.Zero;
@@ -522,7 +519,7 @@ namespace Akka.Util.Collections
 
         public virtual E PollFirst(TimeSpan timeout)
         {
-            var deadline = DateTime.Now;
+            DateTime deadline = DateTime.Now;
 
             if (timeout > TimeSpan.Zero)
             {
@@ -537,12 +534,12 @@ namespace Akka.Util.Collections
                 {
                     if (timeout == TimeSpan.Zero)
                     {
-                        return null;
+                        return default;
                     }
 
                     notEmpty.Await(timeout);
 
-                    var awakeTime = DateTime.Now;
+                    DateTime awakeTime = DateTime.Now;
                     if (awakeTime > deadline)
                     {
                         timeout = TimeSpan.Zero;
@@ -567,7 +564,7 @@ namespace Akka.Util.Collections
 
         public virtual E PollLast(TimeSpan timeout)
         {
-            var deadline = DateTime.Now;
+            DateTime deadline = DateTime.Now;
 
             if (timeout > TimeSpan.Zero)
             {
@@ -582,12 +579,12 @@ namespace Akka.Util.Collections
                 {
                     if (timeout == TimeSpan.Zero)
                     {
-                        return null;
+                        return default;
                     }
 
                     notEmpty.Await(timeout);
 
-                    var awakeTime = DateTime.Now;
+                    DateTime awakeTime = DateTime.Now;
                     if (awakeTime > deadline)
                     {
                         timeout = TimeSpan.Zero;
@@ -607,14 +604,14 @@ namespace Akka.Util.Collections
 
         public virtual E GetFirst()
         {
-            var x = PeekFirst();
+            E x = PeekFirst();
             if (x == null) throw new NoSuchElementException();
             return x;
         }
 
         public virtual E GetLast()
         {
-            var x = PeekLast();
+            E x = PeekLast();
             if (x == null) throw new NoSuchElementException();
             return x;
         }
@@ -624,7 +621,7 @@ namespace Akka.Util.Collections
             mutex.Lock();
             try
             {
-                return first?.item;
+                return (first == null) ? default : first.item;
             }
             finally
             {
@@ -637,7 +634,7 @@ namespace Akka.Util.Collections
             mutex.Lock();
             try
             {
-                return (last == null) ? null : last.item;
+                return (last == null) ? default : last.item;
             }
             finally
             {
@@ -805,12 +802,12 @@ namespace Akka.Util.Collections
             }
         }
 
-        public virtual int DrainTo(Collection<E> c)
+        public virtual int DrainTo(ICollection<E> c)
         {
             return DrainTo(c, Int32.MaxValue);
         }
 
-        public virtual int DrainTo(Collection<E> c, int maxElements)
+        public virtual int DrainTo(ICollection<E> c, int maxElements)
         {
             if (c == null) throw new NullReferenceException();
             if (ReferenceEquals(c, this)) throw new ArgumentException();
@@ -839,19 +836,16 @@ namespace Akka.Util.Collections
         /// <summary>
         /// Returns the number of elements in this deque.
         /// </summary>
-        public override int Count
+        public override int Size()
         {
-            get
+            mutex.Lock();
+            try
             {
-                mutex.Lock();
-                try
-                {
-                    return count;
-                }
-                finally
-                {
-                    mutex.UnLock();
-                }
+                return count;
+            }
+            finally
+            {
+                mutex.UnLock();
             }
         }
 
@@ -867,7 +861,7 @@ namespace Akka.Util.Collections
             mutex.Lock();
             try
             {
-                for (var p = first; p != null; p = p.next)
+                for (Node<E> p = first; p != null; p = p.next)
                 {
                     if (o.Equals(p.item))
                     {
@@ -896,9 +890,9 @@ namespace Akka.Util.Collections
             mutex.Lock();
             try
             {
-                var a = new E[count];
-                var k = 0;
-                for (var p = first; p != null; p = p.next)
+                E[] a = new E[count];
+                int k = 0;
+                for (Node<E> p = first; p != null; p = p.next)
                 {
                     a[k++] = p.item;
                 }
@@ -928,10 +922,10 @@ namespace Akka.Util.Collections
             mutex.Lock();
             try
             {
-                for (var f = first; f != null;)
+                for (Node<E> f = first; f != null;)
                 {
-                    f.item = null;
-                    var n = f.next;
+                    f.item = default;
+                    Node<E> n = f.next;
                     f.prev = null;
                     f.next = null;
                     f = n;
@@ -947,12 +941,12 @@ namespace Akka.Util.Collections
             }
         }
 
-        public override Iterator<E> Iterator()
+        public override IIterator<E> Iterator()
         {
             return new Itr(this);
         }
 
-        public virtual Iterator<E> DescendingIterator()
+        public virtual IIterator<E> DescendingIterator()
         {
             return new DescendingItr(this);
         }
@@ -964,7 +958,7 @@ namespace Akka.Util.Collections
         /**
          * Base class for Iterators for LinkedBlockingDeque
          */
-        private abstract class AbstractItr : Iterator<E>
+        private abstract class AbstractItr : IIterator<E>
         {
             Node<E> next;
 
@@ -996,7 +990,7 @@ namespace Akka.Util.Collections
                 try
                 {
                     next = FirstNode();
-                    nextItem = (next == null) ? null : next.item;
+                    nextItem = (next == null) ? default : next.item;
                 }
                 finally
                 {
@@ -1010,7 +1004,7 @@ namespace Akka.Util.Collections
                 try
                 {
                     // assert next != null;
-                    var s = NextNode(next);
+                    Node<E> s = NextNode(next);
                     if (s == next)
                     {
                         next = FirstNode();
@@ -1026,7 +1020,7 @@ namespace Akka.Util.Collections
                         next = s;
                     }
 
-                    nextItem = (next == null) ? null : next.item;
+                    nextItem = (next == null) ? default : next.item;
                 }
                 finally
                 {
@@ -1044,14 +1038,14 @@ namespace Akka.Util.Collections
                 if (next == null) throw new NoSuchElementException();
 
                 lastRet = next;
-                var x = nextItem;
+                E x = nextItem;
                 Advance();
                 return x;
             }
 
             public void Remove()
             {
-                var n = lastRet;
+                Node<E> n = lastRet;
                 if (n == null) throw new InvalidOperationException();
 
                 lastRet = null;

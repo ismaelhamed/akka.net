@@ -1,30 +1,20 @@
 ﻿using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Text;
-using Akka.Util.Internal.Collections;
 
 namespace Akka.Util.Collections
 {
-    public abstract class AbstractCollection<E> : ICollection<E> where E : class
+    public abstract class AbstractCollection<E> : ICollection<E>
     {
-        public abstract int Count { get; }
+        public abstract int Size();
 
-        public bool IsReadOnly { get; }
+        public abstract IIterator<E> Iterator();
 
-        //public abstract int Size();
-
-        //public abstract Iterator<E> Iterator();
-
-        public virtual bool Add(E item)
-        {
-            throw new NotSupportedException();
-        }
+        public virtual bool Add(E item) => throw new NotSupportedException();
 
         public virtual bool AddAll(ICollection<E> collection)
         {
             bool result = false;
-            Iterator<E> iterator = collection.Iterator();
+            IIterator<E> iterator = collection.Iterator();
             while (iterator.HasNext)
             {
                 if (Add(iterator.Next()))
@@ -37,7 +27,7 @@ namespace Akka.Util.Collections
 
         public virtual void Clear()
         {
-            Iterator<E> iterator = Iterator();
+            IIterator<E> iterator = Iterator();
             while (iterator.HasNext)
             {
                 iterator.Next();
@@ -47,7 +37,7 @@ namespace Akka.Util.Collections
 
         public virtual bool Contains(E element)
         {
-            Iterator<E> it = Iterator();
+            IIterator<E> it = Iterator();
             if (element != null)
             {
                 while (it.HasNext)
@@ -73,7 +63,7 @@ namespace Akka.Util.Collections
 
         public virtual bool ContainsAll(ICollection<E> collection)
         {
-            Iterator<E> it = collection.Iterator();
+            IIterator<E> it = collection.Iterator();
             while (it.HasNext)
             {
                 if (!Contains(it.Next()))
@@ -84,11 +74,14 @@ namespace Akka.Util.Collections
             return true;
         }
 
-        public virtual bool IsEmpty() => Count == 0;
+        public virtual bool IsEmpty()
+        {
+            return Size() == 0;
+        }
 
         public virtual bool Remove(E element)
         {
-            Iterator<E> it = Iterator();
+            IIterator<E> it = Iterator();
             if (element != null)
             {
                 while (it.HasNext)
@@ -117,7 +110,7 @@ namespace Akka.Util.Collections
         public virtual bool RemoveAll(ICollection<E> collection)
         {
             bool result = false;
-            Iterator<E> it = Iterator();
+            IIterator<E> it = Iterator();
             while (it.HasNext)
             {
                 if (collection.Contains(it.Next()))
@@ -132,7 +125,7 @@ namespace Akka.Util.Collections
         public virtual bool RetainAll(ICollection<E> collection)
         {
             bool result = false;
-            Iterator<E> it = Iterator();
+            IIterator<E> it = Iterator();
             while (it.HasNext)
             {
                 if (!collection.Contains(it.Next()))
@@ -148,7 +141,7 @@ namespace Akka.Util.Collections
         {
             int size = Size();
             int index = 0;
-            Iterator<E> it = Iterator();
+            IIterator<E> it = Iterator();
             E[] array = new E[size];
             while (index < size)
             {
@@ -169,9 +162,9 @@ namespace Akka.Util.Collections
                 return "[]";
             }
 
-            var buffer = new StringBuilder(Count * 16);
+            StringBuilder buffer = new StringBuilder(Size() * 16);
             buffer.Append('[');
-            Iterator<E> it = Iterator();
+            IIterator<E> it = Iterator();
             while (it.HasNext)
             {
                 E next = it.Next();
@@ -191,20 +184,6 @@ namespace Akka.Util.Collections
             }
             buffer.Append(']');
             return buffer.ToString();
-        }
-
-        void ICollection<E>.Add(E item) => Add(item);
-
-        public void CopyTo(E[] array, int arrayIndex)
-        {
-            throw new NotImplementedException();
-        }
-
-        public abstract IEnumerator<E> GetEnumerator();
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            throw new NotImplementedException();
         }
     }
 }

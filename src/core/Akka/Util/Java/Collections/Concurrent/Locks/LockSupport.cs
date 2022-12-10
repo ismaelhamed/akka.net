@@ -1,0 +1,226 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Threading;
+
+namespace Akka.Util.Collections.Concurrent.Locks
+{
+    /// <summary>
+    /// Lock support methods.  This class associates, with each thread that uses it,
+    /// a permit (in the sense of the Semaphore class). A call to park will return
+    /// immediately if the permit is available, consuming it in the process; otherwise
+    /// it may block. A call to unpark makes the permit available, if it was not already
+    /// available. (Unlike with Semaphores though, permits do not accumulate. There is
+    /// at most one.)
+    /// </summary>
+    public static class LockSupport
+    {
+        private static readonly IDictionary<object, EventWaitHandle> parkTokens =
+            new Dictionary<object, EventWaitHandle>();
+        private static readonly object mutex = new object();
+
+        /// <summary>
+        /// An always set event that is used to check if the current thread has been interrupted
+        /// by some other Thread.  This is used only if the stored Thread local boolean isn't
+        /// set meaning that the thread wasn't in a Park operation but we still want to check
+        /// if its been interrupted from some other wait, or before performing something that
+        /// we know is going to cause it to block.
+        /// </summary>
+        private static readonly ManualResetEvent interuptGate = new ManualResetEvent(true);
+
+        /// <summary>
+        /// Disables the current thread for thread scheduling purposes unless the
+        /// permit is available.  If the permit is available then it is consumed and
+        /// the call returns immediately; otherwise the current thread becomes disabled
+        /// for thread scheduling purposes and lies dormant until one of three things
+        /// happens; Some other thread invokes unpark with the current thread as the
+        /// target; or Some other thread interrupts the current thread; or The call
+        /// spuriously (that is, for no reason) returns.
+        /// </summary>
+        public static void Park()
+        {
+            var parkToken = GetParkToken();
+            try
+            {
+                parkToken.WaitOne();
+            }
+            catch (ThreadInterruptedException)
+            {
+                SetInterrupted();
+            }
+            parkToken.Reset();
+        }
+
+        /// <summary>
+        /// Disables the current thread for thread scheduling purposes for the specified
+        /// deadline unless the permit is available.  If the permit is available then it
+        /// is consumed and the call returns immediately; otherwise the current thread
+        /// becomes disabled for thread scheduling purposes and lies dormant until one
+        /// of three things happens; Some other thread invokes unpark with the current
+        /// thread as the target; or Some other thread interrupts the current thread;
+        /// or The call spuriously (that is, for no reason) returns.
+        /// </summary>
+        public static void Park(int deadline)
+        {
+            if (deadline <= 0)
+            {
+                return;
+            }
+
+            EventWaitHandle parkToken = GetParkToken();
+            try
+            {
+                parkToken.WaitOne(deadline, false);
+            }
+            catch (ThreadInterruptedException)
+            {
+                SetInterrupted();
+            }
+            parkToken.Reset();
+        }
+
+        /// <summary>
+        /// Disables the current thread for thread scheduling purposes for the specified
+        /// deadline unless the permit is available.  If the permit is available then it
+        /// is consumed and the call returns immediately; otherwise the current thread
+        /// becomes disabled for thread scheduling purposes and lies dormant until one
+        /// of three things happens; Some other thread invokes unpark with the current
+        /// thread as the target; or Some other thread interrupts the current thread;
+        /// or The call spuriously (that is, for no reason) returns.
+        /// </summary>
+        public static void Park(TimeSpan deadline)
+        {
+            EventWaitHandle parkToken = GetParkToken();
+            try
+            {
+                parkToken.WaitOne((int)deadline.TotalMilliseconds, false);
+            }
+            catch (ThreadInterruptedException)
+            {
+                SetInterrupted();
+            }
+            parkToken.Reset();
+        }
+
+        /// <summary>
+        /// Disables the current thread for thread scheduling purposes for the specified
+        /// deadline unless the permit is available.  If the permit is available then it
+        /// is consumed and the call returns immediately; otherwise the current thread
+        /// becomes disabled for thread scheduling purposes and lies dormant until one
+        /// of three things happens; Some other thread invokes unpark with the current
+        /// thread as the target; or Some other thread interrupts the current thread;
+        /// or The call spuriously (that is, for no reason) returns.
+        /// </summary>
+        public static void ParkUntil(DateTime deadline)
+        {
+            if (deadline < DateTime.Now)
+            {
+                return;
+            }
+
+            TimeSpan interval = deadline - DateTime.Now;
+            EventWaitHandle parkToken = GetParkToken();
+            try
+            {
+                parkToken.WaitOne((int)interval.TotalMilliseconds, false);
+            }
+            catch (ThreadInterruptedException)
+            {
+                SetInterrupted();
+            }
+            parkToken.Reset();
+        }
+
+        /// <summary>
+        /// Park this instance.
+        /// </summary>
+        public static void ParkNanos(long nanos)
+        {
+            TimeSpan interval = TimeSpan.FromTicks(nanos / 100);
+            EventWaitHandle parkToken = GetParkToken();
+            try
+            {
+                parkToken.WaitOne((int)interval.TotalMilliseconds, false);
+            }
+            catch (ThreadInterruptedException)
+            {
+                SetInterrupted();
+            }
+            parkToken.Reset();
+        }
+
+        /// <summary>
+        /// Makes available the permit for the given thread, if it was not already available.
+        /// If the thread was blocked on park then it will unblock. Otherwise, its next call
+        /// to park is guaranteed not to block. This operation is not guaranteed to have any
+        /// effect at all if the given thread has not been started.
+        /// </summary>
+        public static void UnPark(Thread theThread)
+        {
+            EventWaitHandle parkToken = GetParkToken(theThread);
+            parkToken.Set();
+        }
+
+        /// <summary>
+        /// Tests whether the thread has been interrupted while parked. The interrupted
+        /// status of the thread is cleared by this method. In other words, if this method
+        /// were to be called twice in succession, the second call would return false
+        /// (unless the current thread were interrupted again, after the first call had
+        /// cleared its interrupted status and before the second call had examined it).
+        /// </summary>
+        public static bool Interrupted()
+        {
+            bool interrupted = false;
+
+            lock (mutex)
+            {
+                LocalDataStoreSlot slot = Thread.GetNamedDataSlot("Interrupted");
+                if (Thread.GetData(slot) != null)
+                {
+                    interrupted = true;
+                }
+                Thread.SetData(slot, null);
+            }
+
+            if (!interrupted)
+            {
+                try
+                {
+                    interuptGate.WaitOne();
+                }
+                catch (ThreadInterruptedException)
+                {
+                    return true;
+                }
+            }
+
+            return interrupted;
+        }
+
+        private static void SetInterrupted()
+        {
+            LocalDataStoreSlot slot = Thread.GetNamedDataSlot("Interrupted");
+            Thread.SetData(slot, true);
+        }
+
+        private static EventWaitHandle GetParkToken()
+        {
+            return GetParkToken(Thread.CurrentThread);
+        }
+
+        private static EventWaitHandle GetParkToken(Thread target)
+        {
+            EventWaitHandle parkToken = null;
+
+            lock (mutex)
+            {
+                if (!parkTokens.TryGetValue(target.ManagedThreadId, out parkToken))
+                {
+                    parkToken = new ManualResetEvent(false);
+                    parkTokens.Add(target.ManagedThreadId, parkToken);
+                }
+            }
+
+            return parkToken;
+        }
+    }
+}
