@@ -7,13 +7,14 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Threading;
 using Akka.Actor;
 using Akka.Configuration;
 using Akka.Event;
 using Akka.Persistence.Journal;
+using Akka.Util;
 using Akka.Util.Internal;
 
 namespace Akka.Persistence
@@ -106,14 +107,14 @@ namespace Akka.Persistence
 
             Settings = new PersistenceSettings(_system, _config);
 
-            _config.GetStringList("journal.auto-start-journals", new string[] { }).ForEach(id =>
+            _config.GetStringList("journal.auto-start-journals", Array.Empty<string>()).ForEach(id =>
             {
                 if (_log.IsInfoEnabled)
                     _log.Info("Auto-starting journal plugin `{0}`", id);
                 JournalFor(id);
             });
 
-            _config.GetStringList("snapshot-store.auto-start-snapshot-stores", new string[] { }).ForEach(id =>
+            _config.GetStringList("snapshot-store.auto-start-snapshot-stores", Array.Empty<string>()).ForEach(id =>
             {
                 if (_log.IsInfoEnabled)
                     _log.Info("Auto-starting snapshot store `{0}`", id);
@@ -142,7 +143,7 @@ namespace Akka.Persistence
         /// </summary>
         /// <param name="actor">TBD</param>
         /// <returns>TBD</returns>
-        public string PersistenceId(IActorRef actor)
+        public static string PersistenceId(IActorRef actor)
         {
             return actor.Path.ToStringWithoutAddress();
         }
@@ -275,7 +276,7 @@ namespace Akka.Persistence
                 throw new ArgumentException($"Plugin class name must be defined in config property [{configPath}.class]");
             var pluginType = Type.GetType(pluginTypeName, true);
             var pluginDispatcherId = pluginConfig.GetString("plugin-dispatcher", null);
-            object[] pluginActorArgs = pluginType.GetConstructor(new[] { typeof(Config) }) != null ? new object[] { pluginConfig } : null;
+            var pluginActorArgs = pluginType.GetConstructor(new[] { typeof(Config) }) != null ? new object[] { pluginConfig } : null;
             var pluginActorProps = new Props(pluginType, pluginActorArgs).WithDispatcher(pluginDispatcherId);
 
             return system.SystemActorOf(pluginActorProps, pluginActorName);
@@ -303,8 +304,41 @@ namespace Akka.Persistence
 
             return new PluginHolder(plugin, adapters, config);
         }
-    }
 
+        /// <summary>
+        /// A slice is deterministically defined based on the persistence id.
+        /// <c>NumberOfSlices</c> is not configurable because changing the value would result in
+        /// different slice for a persistence id than what was used before, which would
+        /// result in invalid eventsBySlices.
+        /// 
+        /// <c>NumberOfSlices</c> is 128
+        /// </summary>
+        public readonly int NumberOfSlices = 128;
+
+        /// <summary>
+        /// A slice is deterministically defined based on the persistence id. The purpose is to
+        /// evenly distribute all persistence ids over the slices and be able to query the
+        /// events for a range of slices.
+        /// </summary>
+        public int SliceForPersistenceId(string persistenceId) =>
+            Math.Abs(MurmurHash.StringHash(persistenceId) % NumberOfSlices);
+
+        /// <summary>
+        /// Split the total number of slices into ranges by the given <c>numberOfRanges</c>.
+        /// <para>
+        /// For example, <c>NumberOfSlices</c> is 128 and given 4 <c>numberOfRanges</c> this method will 
+        /// return ranges (0 to 31), (32 to 63), (64 to 93) and (94 to 127).
+        /// </para>
+        /// </summary>
+        public IEnumerable<(int, int)> GetSliceRanges(int numberOfRanges)
+        {
+            var rangeSize = NumberOfSlices / numberOfRanges;
+            if (!(numberOfRanges * rangeSize == NumberOfSlices))
+                throw new ArgumentException($"numberOfRanges [{numberOfRanges}] must be a whole number divisor of numberOfSlices [{NumberOfSlices}].");
+            for (var i = 0; i < numberOfRanges; i++)
+                yield return (i * rangeSize, i * rangeSize + rangeSize - 1);
+        }
+    }
     /// <summary>
     /// Persistence extension.
     /// </summary>
