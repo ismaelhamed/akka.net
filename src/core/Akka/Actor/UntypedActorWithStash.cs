@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+using System;
 using Akka.Dispatch;
 
 namespace Akka.Actor
@@ -33,6 +34,7 @@ namespace Akka.Actor
     /// enforce the mailbox type.
     /// </para>
     /// </summary>
+    [Obsolete("Use AbstractActor instead of UntypedActor.")]
     public abstract class UntypedActorWithStash : UntypedActor, IWithStash
     {
         public IStash Stash { get; set; }
@@ -42,6 +44,7 @@ namespace Akka.Actor
     /// Actor base class with `Stash` that enforces an unbounded deque for the actor.
     /// See <see cref="UntypedActorWithStash"/> for details on how `Stash` works.
     /// </summary>
+    [Obsolete("Use AbstractActor instead of UntypedActor.")]
     public abstract class UntypedActorWithUnboundedStash : UntypedActor, IWithUnboundedStash
     {
         public IStash Stash { get; set; }
@@ -52,6 +55,7 @@ namespace Akka.Actor
     /// manually, and the mailbox should extend the <see cref="IDequeBasedMessageQueueSemantics"/> marker interface.
     /// See <see cref="UntypedActorWithStash"/> for details on how `Stash` works.
     /// </summary>
+    [Obsolete("Use AbstractActor instead of UntypedActor.")]
     public abstract class UntypedActorWithUnrestrictedStash : UntypedActor, IWithUnrestrictedStash
     {
         public IStash Stash { get; set; }

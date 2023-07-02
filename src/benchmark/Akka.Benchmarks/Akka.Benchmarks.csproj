@@ -4,6 +4,9 @@
     <OutputType>Exe</OutputType>
     <TargetFrameworks>$(NetTestVersion);net6.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
+    <TargetFrameworks>$(NetTestVersion)</TargetFrameworks>
+    <TargetFrameworks>$(NetTestVersion);$(NetCoreTestVersion)</TargetFrameworks>
+    <LangVersion>9.0</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +22,7 @@
     <ProjectReference Include="..\..\core\Akka.Persistence\Akka.Persistence.csproj" />
     <ProjectReference Include="..\..\core\Akka.Remote\Akka.Remote.csproj" />
     <ProjectReference Include="..\..\core\Akka.Streams\Akka.Streams.csproj" />
+    <ProjectReference Include="..\..\core\Akka.TestKit\Akka.TestKit.csproj" />
     <ProjectReference Include="..\..\core\Akka\Akka.csproj" />
   </ItemGroup>
 

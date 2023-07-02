@@ -10,8 +10,9 @@ using System;
 namespace Akka.Actor
 {
     /// <summary>
-    /// Interface IUntypedActorContext
+    /// IUntypedActorContext is the UntypedActor equivalent of ActorContext
     /// </summary>
+    [Obsolete("Use IActorContext instead of IUntypedActorContext.")]
     public interface IUntypedActorContext : IActorContext
     {
         /// <summary>
