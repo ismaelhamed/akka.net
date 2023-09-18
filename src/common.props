@@ -10,8 +10,8 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <PropertyGroup>
-    <XunitVersion>2.4.2</XunitVersion>
-    <XunitRunnerVersion>2.4.2</XunitRunnerVersion>
+    <XunitVersion>2.5.1</XunitVersion>
+    <XunitRunnerVersion>2.5.1</XunitRunnerVersion>
     <TestSdkVersion>17.4.1</TestSdkVersion>
     <HyperionVersion>0.12.2</HyperionVersion>
     <NewtonsoftJsonVersion>[13.0.1,)</NewtonsoftJsonVersion>
