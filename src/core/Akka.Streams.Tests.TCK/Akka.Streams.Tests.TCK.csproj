@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 <Import Project="..\..\common.props" />
   <Import Project="..\..\xunitSettings.props" />
   <PropertyGroup>
@@ -24,7 +24,7 @@
     <!-- !!!WARNING!!! 
          NUNIT VERSION HAVE TO MATCH WITH THE VERSION USED BY REACTIVE TCK. 
          !!!WARNING!!! -->
-    <PackageReference Include="NUnit" Version="3.7.1" Condition="'$(TargetFramework)' == '$(NetCoreTestVersion)'"/>
+    <PackageReference Include="NUnit" Version="4.0.0" Condition="'$(TargetFramework)' == '$(NetCoreTestVersion)'"/>
   </ItemGroup>
 
   <PropertyGroup Condition=" '$(TargetFramework)' == '$(NetFrameworkTestVersion)' ">
