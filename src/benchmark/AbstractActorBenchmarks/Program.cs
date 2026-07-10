@@ -12,7 +12,7 @@ namespace AbstractActorBenchmarks
 
             var server = system.ActorOf(Server.Props(ActorRefs.Nobody), "server1");
 
-            var count = 100_000;
+            var count = 1;
             for (var i = 0; i < count; i++)
             {
                 var client = system.ActorOf(Client.Props(new DnsEndPoint("localhost", 50600), ActorRefs.Nobody));

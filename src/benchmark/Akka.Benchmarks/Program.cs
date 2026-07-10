@@ -16,7 +16,7 @@ namespace Akka.Benchmarks
         static void Main(string[] args)
         {
             //BenchmarkSwitcher.FromAssembly(Assembly.GetExecutingAssembly()).Run(args);
-            BenchmarkRunner.Run<AbstractActorBenchmarks>();
+            BenchmarkRunner.Run<PingPongBenchmark2>();
         }
     }
 }

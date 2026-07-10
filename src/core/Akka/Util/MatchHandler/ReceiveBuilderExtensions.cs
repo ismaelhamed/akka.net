@@ -8,7 +8,6 @@
 using System;
 using System.Threading.Tasks;
 using Akka.Dispatch;
-using Akka.Tools.MatchHandler;
 
 namespace Akka.Actor
 {

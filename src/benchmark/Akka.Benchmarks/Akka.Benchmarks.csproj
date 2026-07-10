@@ -6,7 +6,7 @@
     <IsPackable>false</IsPackable>
     <TargetFrameworks>$(NetTestVersion)</TargetFrameworks>
     <TargetFrameworks>$(NetTestVersion);$(NetCoreTestVersion)</TargetFrameworks>
-    <LangVersion>9.0</LangVersion>
+    <LangVersion>10.0</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>

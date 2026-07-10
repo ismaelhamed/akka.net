@@ -8,14 +8,16 @@
 using System.Threading;
 using Akka.Actor;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Engines;
 
 namespace Akka.Benchmarks.Actor
 {
     [MemoryDiagnoser]
-    [SimpleJob(targetCount: 5, launchCount: 1, warmupCount: 5)]
+    [SimpleJob(RunStrategy.Throughput, iterationCount: 15, warmupCount: 5, invocationCount: 1)]
+    [RankColumn]
     public class AbstractActorBenchmarks
     {
-        [Params(10_000)]
+        [Params(50_000)]
         public int ActorCount { get; set; }
 
         private ActorSystem system;
@@ -26,7 +28,7 @@ namespace Akka.Benchmarks.Actor
         [IterationCleanup]
         public void Cleanup() => system.Terminate().Wait();
 
-        [Benchmark(Description = "UntypedActor")]
+        [Benchmark(Description = "UntypedActor", Baseline = true)]
         public void SpawnUntypedActor()
         {
             var latch = new CountdownEvent(ActorCount);
@@ -43,10 +45,16 @@ namespace Akka.Benchmarks.Actor
             actor.Tell(new StartTest(ActorCount));
             latch.Wait();
         }
+
+        [Benchmark(Description = "AbstractActor")]
+        public void SpawnAbstractActor()
+        {
+            var latch = new CountdownEvent(ActorCount);
+            var actor = system.ActorOf(ParentAbstractActor.Props(latch));
+            actor.Tell(new StartTest(ActorCount));
+            latch.Wait();
+        }
     }
-
-    #region actors
-
     sealed class StartTest
     {
         public int ActorCount { get; }
@@ -134,5 +142,39 @@ namespace Akka.Benchmarks.Actor
         }
     }
 
-    #endregion
+    sealed class ParentAbstractActor : AbstractActor
+    {
+        private readonly CountdownEvent latch;        
+
+        public static Props Props(CountdownEvent latch) =>
+            Akka.Actor.Props.Create<ParentAbstractActor>(latch);
+
+        public ParentAbstractActor(CountdownEvent latch) => this.latch = latch;
+
+        protected override Receive CreateReceive => 
+            ReceiveBuilder
+                .Match<StartTest>(start =>
+                {
+                    for (var i = 0; i < start.ActorCount; i++)
+                        Context.ActorOf(Child.Props);
+                })
+                .Match<ChildReady>(_ =>
+                {
+                    if (latch.Signal()) Context.Stop(Self);
+                })
+                .Build();
+
+        sealed class Child : AbstractActor
+        {
+            public static readonly Props Props = Props.Create<Child>();
+
+            protected override Receive CreateReceive => ReceiveBuilder.Build();
+
+            protected override void PreStart()
+            {
+                base.PreStart();
+                Context.Parent.Tell(ChildReady.Instance);
+            }
+        }
+    }
 }

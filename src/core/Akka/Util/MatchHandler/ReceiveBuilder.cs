@@ -6,23 +6,12 @@
 //-----------------------------------------------------------------------
 
 using System;
-using Akka.Actor;
 
-namespace Akka.Tools.MatchHandler
+namespace Akka.Actor
 {
-    /// <summary>
-    /// Used for building a partial function for <see cref="ActorBase.Receive(object)"/>.
-    /// <para>
-    /// There is both a match on type only, and a match on type and predicate.
-    /// </para>
-    /// Inside an actor you can use it like this to define your receive method:
-    /// <code>
-    /// // TODO
-    /// </code>
-    /// </summary>
     public class ReceiveBuilder
     {
-        private readonly MatchBuilder _matchHandlerBuilder = new(CachedMatchCompiler<object>.Instance);
+        private readonly ReceiveActorHandlers _messageHandlers = new();
 
         /// <summary>
         /// Return a new <see cref="ReceiveBuilder"/> with no case statements. They can be added later as the
@@ -30,20 +19,21 @@ namespace Akka.Tools.MatchHandler
         /// </summary>
         public static ReceiveBuilder Create() => new();
 
-        /// <summary>
-        /// Build a <see cref="PartialAction{T}"/> from this builder. After this call the builder will be reset.
-        /// </summary>
-        public Receive Build() => _matchHandlerBuilder.Build().Invoke;
+        public Receive Build() => _messageHandlers.TryHandle;
 
         public ReceiveBuilder Match<T>(Func<T, bool> handler)
         {
-            _matchHandlerBuilder.Match(handler);
+            _messageHandlers.AddGenericReceiveHandler<T>(null, handler);
             return this;
         }
 
         public ReceiveBuilder Match<T>(Action<T> handler, Predicate<T> shouldHandle = null)
         {
-            _matchHandlerBuilder.Match(handler, shouldHandle);
+            _messageHandlers.AddGenericReceiveHandler<T>(shouldHandle, message =>
+            {
+                handler(message);
+                return true;
+            });
             return this;
         }
 
@@ -56,7 +46,7 @@ namespace Akka.Tools.MatchHandler
         /// <returns>A builder with the case statement added</returns>
         public ReceiveBuilder MatchAny(Action<object> apply)
         {
-            _matchHandlerBuilder.MatchAny(apply);
+            _messageHandlers.AddReceiveAnyHandler(apply);
             return this;
         }
     }

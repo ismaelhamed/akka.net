@@ -6,39 +6,28 @@
 //-----------------------------------------------------------------------
 
 using System;
-using System.Threading.Tasks;
 using Akka.Dispatch;
-using Akka.Tools.MatchHandler;
 
 namespace Akka.Actor
 {
     public abstract class AbstractActor : ActorBase
     {
+        // Cache the delegate per actor instance
+        private Receive _receive;
+
         /// <summary>
         /// An actor has to define its initial receive behavior by implementing
         /// the `CreateReceive` method.
         /// </summary>
         protected abstract Receive CreateReceive { get; }
 
-        protected override bool Receive(object message) => CreateReceive(message);
+        protected override bool Receive(object message) => (_receive ??= CreateReceive)(message);
 
         /// <summary>
         /// Convenience factory of the `ReceiveBuilder`.
-        /// Creates a new empty <see cref="Tools.MatchHandler.ReceiveBuilder"/>.
+        /// Creates a new empty <see cref="ReceiveBuilder"/>.
         /// </summary>
-        public static ReceiveBuilder ReceiveBuilder => ReceiveBuilder.Create();
-
-        /// <summary>
-        /// TBD
-        /// </summary>
-        /// <param name="action">TBD</param>
-        protected void RunTask(Action action) => ActorTaskScheduler.RunTask(action);
-
-        /// <summary>
-        /// TBD
-        /// </summary>
-        /// <param name="action">TBD</param>
-        protected void RunTask(Func<Task> action) => ActorTaskScheduler.RunTask(action);
+        public static ReceiveBuilder2 ReceiveBuilder => ReceiveBuilder2.Create();
     }
 
     /// <summary>
