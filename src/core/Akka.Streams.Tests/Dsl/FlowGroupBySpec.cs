@@ -11,14 +11,11 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using Akka.Streams.Dsl;
-using Akka.Streams.Dsl.Internal;
 using Akka.Streams.Implementation;
 using Akka.Streams.Implementation.Fusing;
 using Akka.Streams.Supervision;
 using Akka.Streams.TestKit;
 using Akka.TestKit;
-using Akka.TestKit.Extensions;
-using Akka.TestKit.Xunit.Internals;
 using Akka.Util;
 using FluentAssertions;
 using FluentAssertions.Extensions;
@@ -93,11 +90,11 @@ namespace Akka.Streams.Tests.Dsl
                 var source = Source.From(new[] { "Aaa", "Abb", "Bcc", "Cdd", "Cee" })
                     .GroupBy(3, s => s.Substring(0, 1))
                     .Grouped(10)
-                    .MergeSubstreams()
-                    .Grouped(10);
-                var task =
-                    ((Source<IEnumerable<IEnumerable<string>>, NotUsed>)source).RunWith(
-                        Sink.First<IEnumerable<IEnumerable<string>>>(), Materializer);
+                    .MergeSubstreams();
+
+                var task = ((Source<IEnumerable<string>, NotUsed>)source)
+                    .Grouped(10)
+                    .RunWith(Sink.First<IEnumerable<IEnumerable<string>>>(), Materializer);
 
                 await task.WaitAsync(3.Seconds());
                 task.Result.OrderBy(e => e.First())

@@ -10,7 +10,6 @@ using Akka.Streams.Dsl;
 using Akka.Streams.TestKit;
 using FluentAssertions;
 using Xunit;
-using Akka.Streams.Dsl.Internal;
 using Akka.TestKit;
 using Reactive.Streams;
 using System.Threading.Tasks;
@@ -64,9 +63,11 @@ namespace Akka.Streams.Tests.Dsl
                 .SplitWhen(x => x%2 == 0)
                 .PrefixAndTail(0)
                 .Select(x => x.Item2)
-                .ConcatSubstream()
-                .ConcatMany(x => x);
-            ((Source<int, NotUsed>) source).RunWith(Sink.FromSubscriber(subscriber), Materializer);
+                .ConcatSubstream();
+
+            ((Source<Source<int, NotUsed>, NotUsed>)source)
+                .ConcatMany(x => x)
+                .RunWith(Sink.FromSubscriber(subscriber), Materializer);
 
             for (var i = 1; i <= 10; i++)
                 subscriber.RequestNext(i);
